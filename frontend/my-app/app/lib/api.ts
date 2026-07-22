@@ -2,6 +2,7 @@
 import { InsurancePolicy } from "@/app/types/insurancePolicy";
 import { DashboardStats } from "@/app/types/dashBoard";
 import { LegalCase } from "@/app/types/legalCase";
+import { CreateTenantPayload } from "@/app/types/tenant";
 export const fetchDashboardData = async (tenantName: string) => {
   const response = await fetch("http://127.0.0.1:8000/api/dashboard/clients", {
     method: "GET",
@@ -226,4 +227,22 @@ export async function fetchLegalDashboardStats(tenant: string) {
   }
 
   return res.json();
+}
+
+export async function createTenant(payload: CreateTenantPayload, adminSecret: string) {
+  const response = await fetch("http://localhost:8000/api/admin/tenants", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "x-admin-secret": adminSecret,
+    },
+    body: JSON.stringify(payload),
+  });
+
+  if (!response.ok) {
+    const errorData = await response.json();
+    throw new Error(errorData.detail || "Failed to provision tenant");
+  }
+
+  return await response.json();
 }

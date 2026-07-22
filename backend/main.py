@@ -9,7 +9,7 @@ from sqlalchemy import text
 from database import SessionLocal, engine, Base, get_db_for_tenant, get_db
 import models
 import schemas  # Clean import from schemas.py
-from routers import insurance, dashboard, legal
+from routers import insurance, dashboard, legal, admin
 from sqlalchemy.orm.attributes import flag_modified
 app = FastAPI()
 
@@ -31,6 +31,7 @@ app.add_middleware(
 app.include_router(insurance.router)
 app.include_router(dashboard.router)
 app.include_router(legal.router)
+app.include_router(admin.router)
 
 # --- API ENDPOINTS ---
 

@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { loginTenant } from "@/app/lib/api";
+import Link from "next/link";
 
 export default function LoginPage() {
   const [companyInput, setCompanyInput] = useState("");
@@ -24,7 +25,7 @@ export default function LoginPage() {
 
     try {
       const data = await loginTenant(companyInput.trim(), password);
-      
+
       // Fall back to lowercased input if backend doesn't explicitly return tenant slug
       const tenantSlug = data.tenant || data.tenant_slug || companyInput.trim().toLowerCase();
       router.push(`/${tenantSlug}/mypage`);
@@ -41,7 +42,7 @@ export default function LoginPage() {
         <h2 className="text-xl font-bold text-center mb-6 text-slate-800">
           Company Workspace Login
         </h2>
-        
+
         <form onSubmit={handleLogin} className="flex flex-col gap-4">
           <div>
             <label className="block mb-1 text-sm text-slate-600 font-medium">
@@ -77,13 +78,20 @@ export default function LoginPage() {
             suppressHydrationWarning
             type="submit"
             disabled={loading}
-            className={`p-2.5 rounded font-bold text-white text-sm transition ${
-              loading ? "bg-slate-400 cursor-not-allowed" : "bg-blue-600 hover:bg-blue-700"
-            }`}
+            className={`p-2.5 rounded font-bold text-white text-sm transition ${loading ? "bg-slate-400 cursor-not-allowed" : "bg-blue-600 hover:bg-blue-700"
+              }`}
           >
             {loading ? "Verifying..." : "Login to Workspace"}
           </button>
         </form>
+        <div className="mt-6 text-center">
+          <Link
+            href="/admin"
+            className="text-xs font-medium text-slate-400 hover:text-slate-600 transition underline underline-offset-4"
+          >
+            Admin Tenant Portal →
+          </Link>
+        </div>
       </div>
     </div>
   );
