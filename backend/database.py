@@ -1,9 +1,12 @@
+import os
 from sqlalchemy import create_engine, text
 from sqlalchemy.orm import sessionmaker, declarative_base, Session
 from fastapi import Header, HTTPException
 from typing import Generator
 
-DATABASE_URL = "postgresql://postgres:My%40postgre@localhost:5432/saas_mvp"
+# Read from environment, fallback to default dev DB if not specified
+DEFAULT_DB_URL = "postgresql://postgres:My%40postgre@localhost:5432/saas_mvp"
+DATABASE_URL = os.getenv("DATABASE_URL", DEFAULT_DB_URL)
 
 engine = create_engine(DATABASE_URL, pool_size=10, max_overflow=20)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)

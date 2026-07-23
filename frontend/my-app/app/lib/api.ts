@@ -3,6 +3,7 @@ import { InsurancePolicy } from "@/app/types/insurancePolicy";
 import { DashboardStats } from "@/app/types/dashBoard";
 import { LegalCase } from "@/app/types/legalCase";
 import { CreateTenantPayload } from "@/app/types/tenant";
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8000";
 export const fetchDashboardData = async (tenantName: string) => {
   const response = await fetch("http://127.0.0.1:8000/api/dashboard/clients", {
     method: "GET",
@@ -24,7 +25,7 @@ export async function fetchClientDetails(tenant: string, clientName: string) {
     const cleanName = decodeURIComponent(clientName);
     const encodedName = encodeURIComponent(cleanName);
 
-    const res = await fetch(`http://localhost:8000/api/clients/${encodedName}`, {
+    const res = await fetch(`${API_BASE_URL}/api/clients/${encodedName}`, {
         headers: {
             "Content-Type": "application/json",
             "X-Tenant": tenant,
@@ -39,7 +40,7 @@ export async function fetchClientDetails(tenant: string, clientName: string) {
 }
 
 export const fetchAllClients = async (tenantName: string) => {
-  const response = await fetch("http://127.0.0.1:8000/api/clients", {
+  const response = await fetch(`${API_BASE_URL}/api/clients`, {
     method: "GET",
     headers: {
       "Content-Type": "application/json",
@@ -60,7 +61,7 @@ export async function createClient(tenant: string, clientData: any) {
     custom_fields: clientData.custom_fields || {},
   };
 
-  const response = await fetch(`http://localhost:8000/api/clients`, {
+  const response = await fetch(`${API_BASE_URL}/api/clients`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -79,7 +80,7 @@ export async function createClient(tenant: string, clientData: any) {
 }
 
 export const loginTenant = async (companyName: string, password: string) => {
-  const response = await fetch("http://127.0.0.1:8000/api/tenants/login", {
+  const response = await fetch(`${API_BASE_URL}/api/tenants/login`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ company_name: companyName, password }),
@@ -95,7 +96,7 @@ export const loginTenant = async (companyName: string, password: string) => {
 };
 
 export async function deleteClient(tenant: string, clientId: number): Promise<void> {
-  const response = await fetch(`http://127.0.0.1:8000/api/clients/${clientId}`, {
+  const response = await fetch(`${API_BASE_URL}/api/clients/${clientId}`, {
     method: "DELETE",
     headers: {
       "X-Tenant": tenant,
@@ -109,7 +110,7 @@ export async function deleteClient(tenant: string, clientId: number): Promise<vo
 }
 
 export const updateClient = async (tenantName: string, clientId: number, clientData: any) => {
-  const response = await fetch(`http://127.0.0.1:8000/api/clients/${clientId}`, {
+  const response = await fetch(`${API_BASE_URL}/api/clients/${clientId}`, {
     method: "PUT",
     headers: {
       "Content-Type": "application/json",
@@ -129,7 +130,7 @@ export const updateClient = async (tenantName: string, clientId: number, clientD
 // --- INSURANCE POLICY API HELPERS ---
 
 export async function fetchClientPolicies(tenant: string, clientId: number) {
-  const res = await fetch(`http://localhost:8000/api/insurance/clients/${clientId}/policies`, {
+  const res = await fetch(`${API_BASE_URL}/api/insurance/clients/${clientId}/policies`, {
     headers: {
       "X-Tenant": tenant,
     },
@@ -143,7 +144,7 @@ export async function fetchClientPolicies(tenant: string, clientId: number) {
 }
 
 export async function createPolicy(tenant: string, policy: { policy_number: string; coverage_amount: number; client_id: number }) {
-  const res = await fetch(`http://localhost:8000/api/insurance/policies`, {
+  const res = await fetch(`${API_BASE_URL}/api/insurance/policies`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -157,7 +158,7 @@ export async function createPolicy(tenant: string, policy: { policy_number: stri
 }
 
 export async function deletePolicy(tenant: string, policyId: number) {
-  const res = await fetch(`http://localhost:8000/api/insurance/policies/${policyId}`, {
+  const res = await fetch(`${API_BASE_URL}/api/insurance/policies/${policyId}`, {
     method: "DELETE",
     headers: {
       "X-Tenant": tenant,
@@ -168,7 +169,7 @@ export async function deletePolicy(tenant: string, policyId: number) {
 }
 
 export async function fetchDashboardStats(tenant: string) {
-  const res = await fetch(`http://127.0.0.1:8000/api/dashboard/stats`, {
+  const res = await fetch(`${API_BASE_URL}/api/dashboard/stats`, {
     headers: {
       "X-Tenant": tenant,
     },
@@ -179,7 +180,7 @@ export async function fetchDashboardStats(tenant: string) {
 }
 
 export async function fetchClientCases(tenant: string, clientId: number): Promise<LegalCase[]> {
-  const res = await fetch(`http://localhost:8000/api/legal/clients/${clientId}/cases`, {
+  const res = await fetch(`${API_BASE_URL}/api/legal/clients/${clientId}/cases`, {
     headers: { "X-Tenant": tenant },
   });
 
@@ -194,7 +195,7 @@ export async function createCase(
   tenant: string, 
   caseData: { case_number: string; case_type: string; court?: string; client_id: number }
 ) {
-  const res = await fetch(`http://localhost:8000/api/legal/cases`, {
+  const res = await fetch(`${API_BASE_URL}/api/legal/cases`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -208,7 +209,7 @@ export async function createCase(
 }
 
 export async function deleteCase(tenant: string, caseId: number) {
-  const res = await fetch(`http://localhost:8000/api/legal/cases/${caseId}`, {
+  const res = await fetch(`${API_BASE_URL}/api/legal/cases/${caseId}`, {
     method: "DELETE",
     headers: { "X-Tenant": tenant },
   });
@@ -217,7 +218,7 @@ export async function deleteCase(tenant: string, caseId: number) {
 }
 
 export async function fetchLegalDashboardStats(tenant: string) {
-  const res = await fetch(`http://localhost:8000/api/legal/dashboard/stats`, {
+  const res = await fetch(`${API_BASE_URL}/api/legal/dashboard/stats`, {
     headers: { "X-Tenant": tenant },
   });
 
@@ -230,7 +231,7 @@ export async function fetchLegalDashboardStats(tenant: string) {
 }
 
 export async function createTenant(payload: CreateTenantPayload, adminSecret: string) {
-  const response = await fetch("http://localhost:8000/api/admin/tenants", {
+  const response = await fetch(`${API_BASE_URL}/api/admin/tenants`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
