@@ -70,13 +70,14 @@ jobs:
         working-directory: frontend/my-app
         run: npx playwright install --with-deps chromium
 
-        # Initialize DB Schema (Create global tables like admins, tenant_accounts)
-      - name: Initialize Database Schema
+       # Initialize DB Schema & Seed Full Test Data
+      - name: Initialize Database Schema and Seed Data
         working-directory: backend
         env:
           DATABASE_URL: postgresql://postgres:postgrespassword@localhost:5432/saas_mvp_test
-        run: |
-          python -c "from database import engine, Base; import models; Base.metadata.create_all(bind=engine)"
+          SECRET_KEY: ci_super_secret_test_key_for_hmac_sha256_verification
+        run: python seed.py
+        
         # 5. Execute Playwright E2E Suite
       - name: Run Playwright Tests
         working-directory: frontend/my-app

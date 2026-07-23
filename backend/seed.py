@@ -81,6 +81,15 @@ def reset_and_seed():
     ]
     db.add_all(tenants)
     db.commit()
+    
+    # Seed Admin User for Admin Lifecycle Tests
+    admin_user = db.query(models.Admin).filter_by(username="admin").first()
+    if not admin_user:
+        # Uses the same working bcrypt hash or a hashed version of 'admin123'
+        admin = models.Admin(username="admin", password_hash=WORKING_HASH)
+        db.add(admin)
+
+    db.commit()
 
     # 3. Seed Mock Data Tailored to Each Schema
     print("Seeding Company A (Insurance only)...")
@@ -124,6 +133,7 @@ def reset_and_seed():
 
     print("\n✅ Success! Database reset, logins restored, and schema tables created strictly by tenant type.")
     db.close()
+
 
 if __name__ == "__main__":
     reset_and_seed()
