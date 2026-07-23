@@ -6,3 +6,4 @@ export interface Client {
   address?: string;
   custom_fields?: Record<string, any>;
 }
+export {}; // <--- Explicitly forces TypeScript to treat this file as a module

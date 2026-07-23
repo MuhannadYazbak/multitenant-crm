@@ -4,3 +4,4 @@ export interface InsurancePolicy {
   coverage_amount: number;
   client_id: number;
 }
+export {}; // <--- Explicitly forces TypeScript to treat this file as a module

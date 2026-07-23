@@ -7,3 +7,4 @@ export interface LegalCase {
   client_id: number;
   created_at?: string;
 }
+export {}; // <--- Explicitly forces TypeScript to treat this file as a module

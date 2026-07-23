@@ -13,3 +13,4 @@ export interface DashboardStats {
   total_clients: number;
   vertical_stats?: VerticalStats;
 }
+export {}; // <--- Explicitly forces TypeScript to treat this file as a module
