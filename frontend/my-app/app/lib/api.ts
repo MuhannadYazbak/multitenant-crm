@@ -1,8 +1,8 @@
 // lib/api.ts
-import { InsurancePolicy } from "@/app/types/insurancePolicy";
-import { DashboardStats } from "@/app/types/dashBoard";
-import { LegalCase } from "@/app/types/legalCase";
-import { CreateTenantPayload } from "@/app/types/tenant";
+import type { InsurancePolicy } from "@/app/types/insurancePolicy";
+import type { DashboardStats } from "@/app/types/dashBoard";
+import type { LegalCase } from "@/app/types/legalCase";
+import type  { CreateTenantPayload } from "@/app/types/tenant";
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8000";
 export const fetchDashboardData = async (tenantName: string) => {
   const response = await fetch("http://127.0.0.1:8000/api/dashboard/clients", {
