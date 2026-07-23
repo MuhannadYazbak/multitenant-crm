@@ -61,7 +61,7 @@ frontend/my-app/
         ├── TenantDashboardPage.ts    # POM: Client table & quick actions
         └── ClientDetailPage.ts       # POM: Profile editing & dynamic JSONB fields
 
----
+```
 
 ## 🚀 How to Run the Tests
 
@@ -85,8 +85,9 @@ npx playwright test --ui
 
 # 4. View HTML Test Execution Report
 npx playwright show-report
+```
 
-###🔑 Environment Variables
-# ConfigurationThe testing suite relies on environment variables passed into the webServer orchestrator inside playwright.config.ts:
-*DATABASE_URL: postgresql://postgres:***@localhost:5432/saas_mvp_test (Enforces test * *isolation)NEXT_PUBLIC_API_BASE_URL: http://localhost:8000 (Configures frontend backend target)
-*SECRET_KEY: HMAC-SHA256 compliant key ($\ge$ 32 characters)
+### 🔑 Environment Variables
+* **Configuration:** The testing suite relies on environment variables passed into the webServer orchestrator inside playwright.config.ts:
+* **DATABASE_URL:** postgresql://postgres:***@localhost:5432/saas_mvp_test (Enforces test * *isolation)NEXT_PUBLIC_API_BASE_URL: http://localhost:8000 (Configures frontend backend target)
+* **SECRET_KEY:** HMAC-SHA256 compliant key ($\ge$ 32 characters)
