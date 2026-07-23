@@ -10,16 +10,19 @@ export default defineConfig({
   },
   webServer: [
     {
-      // Pass the test DB URL directly to the backend webServer invocation
-      command: 'set "DATABASE_URL=postgresql://postgres:My%40postgre@localhost:5432/saas_mvp_test" && cd ../../backend && .venv\\Scripts\\python.exe -m uvicorn main:app --port 8000',
-      url: "http://localhost:8000/docs",
-      reuseExistingServer: false,
+      // 1. Launch FastAPI Backend
+      command: 'cd ../../backend && uvicorn main:app --host 127.0.0.1 --port 8000',
+      url: 'http://127.0.0.1:8000/docs',
+      reuseExistingServer: !process.env.CI,
+      timeout: 120 * 1000,
     },
     {
-      command: "npm run dev",
-      url: "http://localhost:3000",
-      reuseExistingServer: true,
-    }
+      // 2. Build and Start Next.js Frontend
+      command: 'npm run build && npm run start',
+      url: 'http://127.0.0.1:3000',
+      reuseExistingServer: !process.env.CI,
+      timeout: 120 * 1000,
+    },
   ],
   projects: [
     {
