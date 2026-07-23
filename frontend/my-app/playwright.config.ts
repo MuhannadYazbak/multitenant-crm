@@ -9,21 +9,21 @@ export default defineConfig({
     baseURL: "http://localhost:3000",
   },
   webServer: [
-    {
-      // 1. Launch FastAPI Backend
-      command: 'cd ../../backend && uvicorn main:app --host 127.0.0.1 --port 8000',
-      url: 'http://127.0.0.1:8000/docs',
-      reuseExistingServer: !process.env.CI,
-      timeout: 120 * 1000,
-    },
-    {
-      // 2. Build and Start Next.js Frontend
-      command: 'npm run build && npm run start',
-      url: 'http://127.0.0.1:3000',
-      reuseExistingServer: !process.env.CI,
-      timeout: 120 * 1000,
-    },
-  ],
+  {
+    command: 'uvicorn main:app --port 8000',
+    cwd: '../../backend',
+    port: 8000,
+    reuseExistingServer: !process.env.CI,
+    timeout: 120 * 1000, // 2 minutes max
+  },
+  {
+    command: 'npm run build && npm run start', // or 'npm run dev'
+    cwd: '.',
+    port: 3000,
+    reuseExistingServer: !process.env.CI,
+    timeout: 120 * 1000, // 2 minutes max
+  },
+],
   projects: [
     {
       name: "chromium",
