@@ -1,9 +1,18 @@
 # backend/models.py
 import datetime
-from sqlalchemy import Column, Integer, String, ForeignKey, DateTime, Numeric
+from sqlalchemy import Column, Integer, String, ForeignKey, DateTime, Numeric, func
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import relationship
 from database import Base
+
+# --- ADMIN MODEL FOR JWT AUTH ---
+class Admin(Base):
+    __tablename__ = "admins"
+    __table_args__ = {"schema": "public"}
+
+    username = Column(String(50), primary_key=True, index=True)
+    password_hash = Column(String(255), nullable=False)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
 
 # --- GLOBAL TENANTS (PUBLIC SCHEMA) ---
 class TenantAccount(Base):
@@ -11,9 +20,11 @@ class TenantAccount(Base):
     __table_args__ = {"schema": "public"}
 
     id = Column(Integer, primary_key=True, index=True)
-    company_name = Column(String, unique=True, index=True, nullable=False)
-    password_hash = Column(String, nullable=False)
-    tenant_type = Column(String, nullable=False, default="insurance") # 'insurance', 'legal', 'general'
+    company_name = Column(String(100), unique=True, nullable=False)
+    tenant_type = Column(String(50), nullable=False, default="general")
+    password_hash = Column(String(255), nullable=False)
+    status = Column(String(20), nullable=False, default="active")
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
 
 # --- TENANT CRM CORE ---
 class Client(Base):

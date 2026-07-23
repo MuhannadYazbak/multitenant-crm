@@ -1,5 +1,5 @@
 # backend/main.py
-from fastapi import FastAPI, Depends, HTTPException
+from fastapi import FastAPI, Depends, HTTPException, status
 from fastapi.middleware.cors import CORSMiddleware
 from typing import Optional, List
 from urllib.parse import unquote
@@ -11,6 +11,11 @@ import models
 import schemas  # Clean import from schemas.py
 from routers import insurance, dashboard, legal, admin
 from sqlalchemy.orm.attributes import flag_modified
+from sqlalchemy import func
+from passlib.context import CryptContext
+from auth_utils import verify_password
+from schemas import TenantLoginRequest
+from models import TenantAccount
 app = FastAPI()
 
 app.add_middleware(
@@ -26,6 +31,8 @@ app.add_middleware(
     allow_headers=["*"],
     expose_headers=["*"],
 )
+
+pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 # Register modular vertical routers
 app.include_router(insurance.router)
@@ -87,25 +94,53 @@ def get_tenant_client_detail(name: str, db: Session = Depends(get_db_for_tenant)
     return client
 
 
-@app.post("/api/tenants/login")
-def login_tenant(request: schemas.LoginRequest):
-    safe_tenant = "".join(c for c in request.company_name if c.isalnum() or c in "_-").lower()
+# @app.post("/api/tenants/login")
+# def login_tenant(request: schemas.TenantLoginRequest):
+#     safe_tenant = "".join(c for c in request.company_name if c.isalnum() or c in "_-").lower()
     
-    db = SessionLocal()
-    try:
-        account = db.query(models.TenantAccount).filter(
-            models.TenantAccount.company_name == safe_tenant
-        ).first()
+#     db = SessionLocal()
+#     try:
+#         account = db.query(models.TenantAccount).filter(
+#             models.TenantAccount.company_name == safe_tenant
+#         ).first()
         
-        if not account:
-            raise HTTPException(status_code=404, detail="Company workspace does not exist.")
+#         if not account:
+#             raise HTTPException(status_code=404, detail="Company workspace does not exist.")
             
-        if not verify_password(request.password, account.password_hash):
-            raise HTTPException(status_code=401, detail="Invalid password.")
+#         if not verify_password(request.password, account.password_hash):
+#             raise HTTPException(status_code=401, detail="Invalid password.")
             
-        return {"success": True, "tenant": safe_tenant}
-    finally:
-        db.close()
+#         return {"success": True, "tenant": safe_tenant}
+#     finally:
+#         db.close()
+
+@app.post("/api/tenants/login")
+def tenant_login(payload: TenantLoginRequest, db: Session = Depends(get_db)):
+    account = db.query(TenantAccount).filter(TenantAccount.company_name == payload.company_name).first()
+    
+    if not account:
+        raise HTTPException(status_code=404, detail="Tenant account not found")
+
+    # Status Gate Check
+    if account.status == "frozen":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN, 
+            detail="This workspace is suspended. Please contact system support."
+        )
+    elif account.status == "deleted":
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, 
+            detail="Tenant account not found"
+        )
+
+    if not verify_password(payload.password, account.password_hash):
+        raise HTTPException(status_code=401, detail="Invalid password")
+
+    return {
+        "status": "success",
+        "company_name": account.company_name,
+        "tenant_type": account.tenant_type
+    }
 
 @app.get("/api/tenants/{tenant_name}", response_model=schemas.TenantResponse)
 def get_tenant_info(tenant_name: str, db: Session = Depends(get_db)): # ✅ FIXED: Uses get_db
@@ -171,35 +206,3 @@ def update_client(
         "custom_fields": res_custom
     }
 
-@app.get("/api/dashboard/stats")
-def get_dashboard_stats(db: Session = Depends(get_db_for_tenant)):
-    tenant_type = db.info.get("tenant_type", "general")
-    
-    # Base metric for all tenants
-    total_clients = db.query(models.Client).count()
-    
-    vertical_stats = {}
-
-    if tenant_type == "insurance":
-        total_policies = db.query(models.InsurancePolicy).count()
-        total_coverage = db.query(func.coalesce(func.sum(models.InsurancePolicy.coverage_amount), 0)).scalar()
-        vertical_stats = {
-            "total_policies": total_policies,
-            "total_coverage": float(total_coverage)
-        }
-
-    elif tenant_type == "legal":
-        total_cases = db.query(models.LegalCase).count()
-        open_cases = db.query(models.LegalCase).filter(
-            models.LegalCase.status.ilike("Open") | models.LegalCase.status.ilike("In Progress")
-        ).count()
-        vertical_stats = {
-            "total_cases": total_cases,
-            "open_cases": open_cases
-        }
-
-    return {
-        "tenant_type": tenant_type,
-        "total_clients": total_clients,
-        "vertical_stats": vertical_stats
-    }

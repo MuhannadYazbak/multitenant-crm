@@ -1,5 +1,5 @@
-from pydantic import BaseModel, EmailStr, Field, field_validator
-from typing import Optional, Dict, Any, List
+from pydantic import BaseModel, EmailStr, Field, field_validator, ConfigDict
+from typing import Literal, Optional, Dict, Any, List
 from decimal import Decimal
 from datetime import datetime
 import re
@@ -53,19 +53,37 @@ class ClientResponse(ClientBase):
     class Config:
         from_attributes = True  # Allows Pydantic to read SQLAlchemy ORM models directly
 
-class LoginRequest(BaseModel):
+class TenantCreate(BaseModel):
+    company_name: str
+    password: str
+    tenant_type: Literal["general", "insurance", "legal"] = "general"
+
+class TenantLoginRequest(BaseModel):
     company_name: str
     password: str
 
-# Add this to backend/schemas.py
+class TenantStatusUpdate(BaseModel):
+    # Restrict status options to allowed values
+    status: Literal["active", "frozen", "deleted"]
 
 class TenantResponse(BaseModel):
     id: int
     company_name: str
     tenant_type: str
+    status: str
+    created_at: datetime
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
+
+
+# Admin Auth Schemas
+class AdminLogin(BaseModel):
+    username: str
+    password: str
+
+class AdminToken(BaseModel):
+    access_token: str
+    token_type: str = "bearer"
 
 
 # ==========================================

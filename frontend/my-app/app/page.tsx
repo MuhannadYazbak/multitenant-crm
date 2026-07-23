@@ -86,7 +86,7 @@ export default function LoginPage() {
         </form>
         <div className="mt-6 text-center">
           <Link
-            href="/admin"
+            href="/admin/login"
             className="text-xs font-medium text-slate-400 hover:text-slate-600 transition underline underline-offset-4"
           >
             Admin Tenant Portal →
