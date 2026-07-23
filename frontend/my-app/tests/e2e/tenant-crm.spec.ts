@@ -29,6 +29,7 @@ test.describe("Tenant CRM Full End-to-End Suite", () => {
     };
 
     await tenantDashboard.addClient(originalClient);
+    await page.waitForResponse(response => response.url().includes('/api/clients') && response.status() === 200)
     const clientRow = tenantDashboard.getClientRowByName(originalClient.name);
     await expect(clientRow).toBeVisible();
 
