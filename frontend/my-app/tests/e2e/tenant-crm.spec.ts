@@ -33,7 +33,8 @@ test.describe("Tenant CRM Full End-to-End Suite", () => {
 
     await Promise.all([
       page.waitForResponse(
-        (res) => res.request().method() === "POST" && res.url().includes("/clients") && res.ok()
+        (res) => res.request().method() === "POST" && res.url().includes("/clients") && res.ok(),
+        { timeout: 15000 }
       ),
       tenantDashboard.addClient(originalClient),
     ]);

@@ -34,9 +34,13 @@ export class TenantDashboardPage {
   // In TenantDashboardPage.ts
 
   async openAddClientForm() {
+    // Wait until the toggle button is fully attached and visible
+    await this.toggleAddClientButton.waitFor({ state: "visible" });
+
     if (await this.submitClientButton.isHidden()) {
       await this.toggleAddClientButton.click();
-      await this.submitClientButton.waitFor({ state: "visible" });
+      // Force Playwright to wait until the form's submit button is visible in DOM
+      await this.submitClientButton.waitFor({ state: "visible", timeout: 10000 });
     }
   }
 
@@ -46,7 +50,8 @@ export class TenantDashboardPage {
     await this.emailInput.fill(clientData.email);
     await this.addressInput.fill(clientData.address);
 
-    // Submit form
+    // Ensure button is ready
+    await this.submitClientButton.waitFor({ state: "visible" });
     await this.submitClientButton.click();
   }
 
