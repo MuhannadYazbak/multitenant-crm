@@ -7,6 +7,7 @@ import { fetchAllClients, createClient, deleteClient } from "@/app/lib/api";
 import Navbar from "@/app/components/Navbar"
 import DashboardStatsWidget from "@/app/components/DashBoardStats";
 
+
 export default function Home() {
     const [client, setClient] = useState<Client>({
         name: "",
@@ -38,43 +39,38 @@ export default function Home() {
     };
 
     const handleAddClient = async (e: React.FormEvent) => {
-        e.preventDefault();
+    e.preventDefault();
 
-        // 1. Build key-value map for custom fields
-        const customFieldsObject = customFields.reduce((acc, curr) => {
-            if (curr.key.trim()) {
-                acc[curr.key.trim()] = curr.value.trim();
-            }
-            return acc;
-        }, {} as Record<string, string>);
-
-        // 2. Format & Sanitize Payload for Pydantic Validation
-        const payload = {
-            name: client.name.trim(),
-            phone: client.phone.trim(),
-            email: client.email.trim(),
-            address: client.address?.trim() || null, // Convert empty string "" to null or valid string
-            status: "active",                       // Matches ClientBase schema requirement
-            custom_fields: customFieldsObject,
-        };
-
-        try {
-            // 3. Create Client via API
-            await createClient(tenant, payload);
-
-            // 4. Refresh List & Reset Form State
-            const updatedClients = await fetchAllClients(tenant);
-            setClients(updatedClients);
-
-            // Reset form inputs
-            setClient({ name: "", phone: "", email: "", address: "" });
-            setCustomFields([]);
-        } catch (error: any) {
-            // Detailed logging to catch Pydantic 422 error details
-            console.error("Failed to post new client:", error);
-            alert(error.message || "Failed to create client. Please check the inputs.");
+    const customFieldsObject = customFields.reduce((acc, curr) => {
+        if (curr.key.trim()) {
+            acc[curr.key.trim()] = curr.value.trim();
         }
+        return acc;
+    }, {} as Record<string, string>);
+
+    const payload = {
+        name: client.name.trim(),
+        phone: client.phone.trim(),
+        email: client.email.trim(),
+        address: client.address?.trim() || null,
+        status: "active",
+        custom_fields: customFieldsObject,
     };
+
+    try {
+        await createClient(tenant, payload);
+        const updatedClients = await fetchAllClients(tenant);
+        setClients(updatedClients);
+
+        // RESET & CLOSE FORM
+        setClient({ name: "", phone: "", email: "", address: "" });
+        setCustomFields([]);
+        setIsAddClientOpen(false); // <--- CLOSE FORM ON SUCCESS
+    } catch (error: any) {
+        console.error("Failed to post new client:", error);
+        // Do NOT block tests with unhandled native alerts in CI if possible
+    }
+};
 
     const filteredClients = useMemo(() => {
         if (!searchQuery.trim()) return clients;

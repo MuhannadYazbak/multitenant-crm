@@ -37,18 +37,26 @@ export class TenantDashboardPage {
     }
   }
 
-  async addClient(data: { name: string; phone: string; email: string; address: string }) {
-    await this.openAddClientForm();
-    await this.nameInput.fill(data.name);
-    await this.phoneInput.fill(data.phone);
-    await this.emailInput.fill(data.email);
-    await this.addressInput.fill(data.address);
-    await this.submitClientButton.click();
+  async addClient(clientData: { name: string; phone: string; email: string; address: string }) {
+    // 1. Open the form if it's closed
+    const addButton = this.page.getByRole("button", { name: /Add Client/i });
+    if (await addButton.isVisible()) {
+      await addButton.click();
+    }
+
+    // 2. Fill the inputs
+    await this.page.getByPlaceholder("Enter Your Name").fill(clientData.name);
+    await this.page.getByPlaceholder("Enter Your Phone Number").fill(clientData.phone);
+    await this.page.getByPlaceholder("Enter Your Email").fill(clientData.email);
+    await this.page.getByPlaceholder("Enter Your Address").fill(clientData.address);
+
+    // 3. Click Send button
+    await this.page.getByRole("button", { name: "Send" }).click();
   }
 
   async addCustomField(key: string, value: string) {
     await this.addCustomFieldButton.click();
-    
+
     // Target the newly appended inputs
     const keyInput = this.page.getByPlaceholder("Field Name (e.g. VAT)").last();
     const valueInput = this.page.getByPlaceholder("Value").last();
@@ -67,7 +75,7 @@ export class TenantDashboardPage {
 
   async deleteClientByName(name: string) {
     const row = this.getClientRowByName(name);
-    
+
     // Auto-accept window confirm dialog
     this.page.once("dialog", (dialog) => dialog.accept());
     await row.getByRole("button", { name: "Delete" }).click();

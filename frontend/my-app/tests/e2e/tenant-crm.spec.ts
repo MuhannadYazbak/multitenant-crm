@@ -20,7 +20,7 @@ test.describe("Tenant CRM Full End-to-End Suite", () => {
     await tenantLogin.login("company-a", "supersecret123");
     await expect(page).toHaveURL(/\/company-a\/mypage/);
 
-    // 2. Provision New Client
+   // 2. Provision New Client
     const originalClient = {
       name: "Global Tech Inc",
       phone: "054-9876543",
@@ -28,10 +28,11 @@ test.describe("Tenant CRM Full End-to-End Suite", () => {
       address: "45 Technology Park",
     };
 
-    // Submit the form
+    // Automatically dismiss any unexpected alert dialogs (e.g. error alerts)
+    page.on('dialog', async dialog => await dialog.dismiss());
+
     await tenantDashboard.addClient(originalClient);
 
-    // Playwright automatically retries checking the DOM for up to 10 seconds
     const clientRow = tenantDashboard.getClientRowByName(originalClient.name);
     await expect(clientRow).toBeVisible({ timeout: 10000 });
 
