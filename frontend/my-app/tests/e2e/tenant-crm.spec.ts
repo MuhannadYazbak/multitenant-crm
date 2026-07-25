@@ -28,9 +28,13 @@ test.describe("Tenant CRM Full End-to-End Suite", () => {
       address: "45 Technology Park",
     };
 
-    // Submit form and wait for backend API response
+    // 2. Create Client
+    await tenantDashboard.openAddClientForm();
+
     await Promise.all([
-      page.waitForResponse((res) => res.url().includes("/clients") && res.status() < 400),
+      page.waitForResponse(
+        (res) => res.request().method() === "POST" && res.url().includes("/clients") && res.ok()
+      ),
       tenantDashboard.addClient(originalClient),
     ]);
 

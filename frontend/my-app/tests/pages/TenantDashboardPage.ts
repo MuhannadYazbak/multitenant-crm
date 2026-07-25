@@ -31,26 +31,23 @@ export class TenantDashboardPage {
     this.clientsTableRows = page.locator("tbody tr");
   }
 
+  // In TenantDashboardPage.ts
+
   async openAddClientForm() {
     if (await this.submitClientButton.isHidden()) {
       await this.toggleAddClientButton.click();
+      await this.submitClientButton.waitFor({ state: "visible" });
     }
   }
 
   async addClient(clientData: { name: string; phone: string; email: string; address: string }) {
-    // Check if form is open, if not click "➕ Add Client"
-    const openButton = this.page.getByRole("button", { name: "➕ Add Client" });
-    if (await openButton.isVisible()) {
-      await openButton.click();
-    }
+    await this.nameInput.fill(clientData.name);
+    await this.phoneInput.fill(clientData.phone);
+    await this.emailInput.fill(clientData.email);
+    await this.addressInput.fill(clientData.address);
 
-    await this.page.getByPlaceholder("Enter Your Name").fill(clientData.name);
-    await this.page.getByPlaceholder("Enter Your Phone Number").fill(clientData.phone);
-    await this.page.getByPlaceholder("Enter Your Email").fill(clientData.email);
-    await this.page.getByPlaceholder("Enter Your Address").fill(clientData.address);
-
-    // CLICK SUBMIT / SEND
-    await this.page.getByRole("button", { name: "Send" }).click();
+    // Submit form
+    await this.submitClientButton.click();
   }
 
   async addCustomField(key: string, value: string) {
