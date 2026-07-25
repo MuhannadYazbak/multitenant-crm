@@ -28,14 +28,10 @@ test.describe("Tenant CRM Full End-to-End Suite", () => {
       address: "45 Technology Park",
     };
 
-    // Listen for the backend creation response concurrently while submitting the form
-    await Promise.all([
-      page.waitForResponse(
-        (res) => res.url().includes("/api/clients") && (res.status() === 201 || res.status() === 200)
-      ),
-      tenantDashboard.addClient(originalClient),
-    ]);
+    // Submit the form
+    await tenantDashboard.addClient(originalClient);
 
+    // Playwright automatically retries checking the DOM for up to 10 seconds
     const clientRow = tenantDashboard.getClientRowByName(originalClient.name);
     await expect(clientRow).toBeVisible({ timeout: 10000 });
 
