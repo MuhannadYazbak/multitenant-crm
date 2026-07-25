@@ -90,6 +90,7 @@ def reset_and_seed():
     ]
     db.add_all(tenants)
     db.commit()
+    
     # 3. Seed Mock Data Tailored to Each Schema
     print("Seeding Company A (Insurance only)...")
     with engine.connect() as conn:
@@ -100,6 +101,9 @@ def reset_and_seed():
             
             INSERT INTO insurance_policies (client_id, policy_number, coverage_amount)
             VALUES (1, 'POL-INS-1001', 500000.00);
+
+            -- Dynamically fetch sequence for clients.id and advance it to current max id
+            SELECT setval(pg_get_serial_sequence('clients', 'id'), (SELECT MAX(id) FROM clients));
         """))
         conn.commit()
 
@@ -115,6 +119,8 @@ def reset_and_seed():
             
             INSERT INTO legal_cases (client_id, case_number, case_type, court, status)
             VALUES (1, 'CASE-GEN-200', 'Contract Review', 'Arbitration', 'Open');
+
+            SELECT setval(pg_get_serial_sequence('clients', 'id'), (SELECT MAX(id) FROM clients));
         """))
         conn.commit()
 
@@ -127,6 +133,8 @@ def reset_and_seed():
             
             INSERT INTO legal_cases (client_id, case_number, case_type, court, status)
             VALUES (1, 'CASE-LEG-3001', 'Civil Litigation', 'District Magistrate Court', 'Open');
+
+            SELECT setval(pg_get_serial_sequence('clients', 'id'), (SELECT MAX(id) FROM clients));
         """))
         conn.commit()
 
