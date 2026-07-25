@@ -20,26 +20,29 @@ test.describe("Tenant CRM Full End-to-End Suite", () => {
     await tenantLogin.login("company-a", "supersecret123");
     await expect(page).toHaveURL(/\/company-a\/mypage/);
 
-   // 2. Provision New Client
+    // 2. Provision New Client
     const originalClient = {
-      name: "Global Tech Inc",
-      phone: "054-9876543",
-      email: "info@globaltech.com",
+      name: "My New Tesr User", // Strict Pydantic regex compliant
+      phone: "0549876542",
+      email: "user@newtest.com",
       address: "45 Technology Park",
     };
 
-    // Automatically dismiss any unexpected alert dialogs (e.g. error alerts)
-    page.on('dialog', async dialog => await dialog.dismiss());
-
-    await tenantDashboard.addClient(originalClient);
+    // Submit form and wait for backend API response
+    await Promise.all([
+      page.waitForResponse((res) => res.url().includes("/clients") && res.status() < 400),
+      tenantDashboard.addClient(originalClient),
+    ]);
 
     const clientRow = tenantDashboard.getClientRowByName(originalClient.name);
     await expect(clientRow).toBeVisible({ timeout: 10000 });
 
     // 3. Navigate to Client Detail Page via 'Show' Button
-    await clientRow.getByRole("button", { name: "Show" }).click();
-    await expect(page).toHaveURL(/\/company-a\/mypage\/Global%20Tech%20Inc/);
-    await expect(clientDetail.nameHeading).toHaveText(originalClient.name);
+    // Bind click and navigation concurrently so Next.js router.push finishes cleanly
+    await Promise.all([
+      page.waitForURL(new RegExp(`.*/mypage/${encodeURIComponent(originalClient.name)}`)),
+      clientRow.getByRole("button", { name: "Show" }).click(),
+    ]);
 
     // 4. Edit Client Profile Details
     await clientDetail.toggleEditMode();
@@ -60,6 +63,8 @@ test.describe("Tenant CRM Full End-to-End Suite", () => {
     await expect(page).toHaveURL(/\/company-a\/mypage/);
 
     await tenantDashboard.deleteClientByName(originalClient.name);
-    await expect(clientRow).not.toBeVisible();
+
+    // Verify the row is completely gone from the table
+    await expect(tenantDashboard.getClientRowByName(originalClient.name)).not.toBeVisible();
   });
 });

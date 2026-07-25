@@ -38,19 +38,18 @@ export class TenantDashboardPage {
   }
 
   async addClient(clientData: { name: string; phone: string; email: string; address: string }) {
-    // 1. Open the form if it's closed
-    const addButton = this.page.getByRole("button", { name: /Add Client/i });
-    if (await addButton.isVisible()) {
-      await addButton.click();
+    // Check if form is open, if not click "➕ Add Client"
+    const openButton = this.page.getByRole("button", { name: "➕ Add Client" });
+    if (await openButton.isVisible()) {
+      await openButton.click();
     }
 
-    // 2. Fill the inputs
     await this.page.getByPlaceholder("Enter Your Name").fill(clientData.name);
     await this.page.getByPlaceholder("Enter Your Phone Number").fill(clientData.phone);
     await this.page.getByPlaceholder("Enter Your Email").fill(clientData.email);
     await this.page.getByPlaceholder("Enter Your Address").fill(clientData.address);
 
-    // 3. Click Send button
+    // CLICK SUBMIT / SEND
     await this.page.getByRole("button", { name: "Send" }).click();
   }
 
@@ -70,14 +69,23 @@ export class TenantDashboardPage {
   }
 
   getClientRowByName(name: string): Locator {
-    return this.clientsTableRows.filter({ hasText: name });
+    return this.clientsTableRows.filter({ hasText: name }).first();
   }
 
   async deleteClientByName(name: string) {
     const row = this.getClientRowByName(name);
 
-    // Auto-accept window confirm dialog
-    this.page.once("dialog", (dialog) => dialog.accept());
-    await row.getByRole("button", { name: "Delete" }).click();
+    // 1. Set up dialog handler
+    this.page.once("dialog", async (dialog) => {
+      await dialog.accept();
+    });
+
+    // 2. Wait for the DELETE API request to succeed AND click delete
+    await Promise.all([
+      this.page.waitForResponse(
+        (res) => res.request().method() === "DELETE" && res.ok()
+      ),
+      row.getByRole("button", { name: "Delete" }).click(),
+    ]);
   }
 }
