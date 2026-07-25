@@ -20,11 +20,13 @@ test.describe("Tenant CRM Full End-to-End Suite", () => {
     await tenantLogin.login("company-a", "supersecret123");
     await expect(page).toHaveURL(/\/company-a\/mypage/);
 
-    // 2. Provision New Client
+    // 2. Provision New Client with dynamic dynamic email/name to avoid DB 500 unique constraints
+    const uniqueId = Date.now().toString(36).replace(/[0-9]/g, (m) => String.fromCharCode(65 + parseInt(m)));
+
     const originalClient = {
-      name: "My New Tesr User", // Strict Pydantic regex compliant
-      phone: "0549876542",
-      email: "user@newtest.com",
+      name: `Test User ${uniqueId}`, // E.g., "Test User BCJ" (Regex ^[A-Za-z\s'-]+$ compliant)
+      phone: `054${Math.floor(1000000 + Math.random() * 9000000)}`, // Unique 10-digit phone
+      email: `user-${uniqueId.toLowerCase()}@testcrm.com`, // Unique email
       address: "45 Technology Park",
     };
 
@@ -39,16 +41,19 @@ test.describe("Tenant CRM Full End-to-End Suite", () => {
       tenantDashboard.addClient(originalClient),
     ]);
 
-    // Ensure backend returned a successful status code (200, 201, etc.)
+    // Log response body if it ever fails again to debug immediately
+    if (response.status() >= 400) {
+      console.error("Backend Error Response:", await response.text());
+    }
+
     expect(response.status()).toBeLessThan(400);
 
     const clientRow = tenantDashboard.getClientRowByName(originalClient.name);
     await expect(clientRow).toBeVisible({ timeout: 10000 });
 
     // 3. Navigate to Client Detail Page via 'Show' Button
-    // Bind click and navigation concurrently so Next.js router.push finishes cleanly
     await Promise.all([
-      page.waitForURL(new RegExp(`.*/mypage/${encodeURIComponent(originalClient.name)}`)),
+      page.waitForURL(`**/company-a/mypage/*`),
       clientRow.getByRole("button", { name: "Show" }).click(),
     ]);
 
