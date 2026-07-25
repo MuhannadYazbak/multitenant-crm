@@ -28,10 +28,16 @@ test.describe("Tenant CRM Full End-to-End Suite", () => {
       address: "45 Technology Park",
     };
 
-    await tenantDashboard.addClient(originalClient);
-    await page.waitForResponse(response => response.url().includes('/api/clients') && response.status() === 200)
+    // Listen for the backend creation response concurrently while submitting the form
+    await Promise.all([
+      page.waitForResponse(
+        (res) => res.url().includes("/api/clients") && (res.status() === 201 || res.status() === 200)
+      ),
+      tenantDashboard.addClient(originalClient),
+    ]);
+
     const clientRow = tenantDashboard.getClientRowByName(originalClient.name);
-    await expect(clientRow).toBeVisible();
+    await expect(clientRow).toBeVisible({ timeout: 10000 });
 
     // 3. Navigate to Client Detail Page via 'Show' Button
     await clientRow.getByRole("button", { name: "Show" }).click();

@@ -2,6 +2,7 @@
 from database import engine, SessionLocal, Base
 import models
 from sqlalchemy import text
+from auth_utils import hash_password
 
 def reset_and_seed():
     print("Dropping existing tenant schemas and resetting database...")
@@ -71,26 +72,24 @@ def reset_and_seed():
     # 2. Seed Public Tenant Accounts using YOUR working Bcrypt Hashes
     db = SessionLocal()
 
-    # Shared Bcrypt hash from your working SQL log
-    WORKING_HASH = "$2b$12$GZuausL2gNRph9SndjHBKOh.eGqyAkIxrbDK9L6RAtFrzAHtC6bUy"
+    # Hash passwords dynamically using the exact backend hashing logic
+    ADMIN_HASH = hash_password("admin123")
+    TENANT_HASH = hash_password("supersecret123")
 
+    # Seed Admin User
+    admin_user = db.query(models.Admin).filter_by(username="admin").first()
+    if not admin_user:
+        admin = models.Admin(username="admin", password_hash=ADMIN_HASH)
+        db.add(admin)
+
+    # Seed Tenants
     tenants = [
-        models.TenantAccount(company_name="company-a", password_hash=WORKING_HASH, tenant_type="insurance"),
-        models.TenantAccount(company_name="company-b", password_hash=WORKING_HASH, tenant_type="general"),
-        models.TenantAccount(company_name="company-c", password_hash=WORKING_HASH, tenant_type="legal"),
+        models.TenantAccount(company_name="company-a", password_hash=TENANT_HASH, tenant_type="insurance"),
+        models.TenantAccount(company_name="company-b", password_hash=TENANT_HASH, tenant_type="general"),
+        models.TenantAccount(company_name="company-c", password_hash=TENANT_HASH, tenant_type="legal"),
     ]
     db.add_all(tenants)
     db.commit()
-    
-    # Seed Admin User for Admin Lifecycle Tests
-    admin_user = db.query(models.Admin).filter_by(username="admin").first()
-    if not admin_user:
-        # Uses the same working bcrypt hash or a hashed version of 'admin123'
-        admin = models.Admin(username="admin", password_hash=WORKING_HASH)
-        db.add(admin)
-
-    db.commit()
-
     # 3. Seed Mock Data Tailored to Each Schema
     print("Seeding Company A (Insurance only)...")
     with engine.connect() as conn:
