@@ -70,32 +70,31 @@ jobs:
         working-directory: frontend/my-app
         run: npx playwright install --with-deps chromium
 
-      # Initialize DB Schema & Seed Full Test Data
+       # Initialize DB Schema & Seed Full Test Data
       - name: Initialize Database Schema and Seed Data
         working-directory: backend
         env:
           DATABASE_URL: postgresql://postgres:postgrespassword@localhost:5432/saas_mvp_test
-          SECRET_KEY: super_secret_jwt_key_that_is_at_least_32_bytes_long_12345
-          ADMIN_JWT_SECRET: super_secret_jwt_key_that_is_at_least_32_bytes_long_12345
+          SECRET_KEY: ci_super_secret_test_key_for_hmac_sha256_verification_32bytes
+          ADMIN_JWT_SECRET: super_secret_jwt_admin_key_999_32bytes
         run: python seed.py
         
-      # 5. Execute Playwright E2E Suite
+        # 5. Execute Playwright E2E Suite
       - name: Run Playwright Tests
         working-directory: frontend/my-app
         env:
           DATABASE_URL: postgresql://postgres:postgrespassword@localhost:5432/saas_mvp_test
           NEXT_PUBLIC_API_BASE_URL: http://localhost:8000
-          SECRET_KEY: super_secret_jwt_key_that_is_at_least_32_bytes_long_12345
-          ADMIN_JWT_SECRET: super_secret_jwt_key_that_is_at_least_32_bytes_long_12345
+          SECRET_KEY: ci_super_secret_test_key_for_hmac_sha256_verification
           NEXT_TELEMETRY_DISABLED: 1
           CI: true
         run: npx playwright test
 
       # 6. Upload Test Artifacts on Failure
-      - name: Upload Playwright Report
+      - name: Upload Playwright Report & Artifacts
+        if: always()
         uses: actions/upload-artifact@v4
-        if: ${{ !cancelled() }}
         with:
           name: playwright-report
-          path: frontend/my-app/playwright-report/
-          retention-days: 14
+          path: test-results/
+          retention-days: 7

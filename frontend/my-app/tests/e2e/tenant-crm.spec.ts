@@ -31,13 +31,16 @@ test.describe("Tenant CRM Full End-to-End Suite", () => {
     // 2. Create Client
     await tenantDashboard.openAddClientForm();
 
-    await Promise.all([
+    const [response] = await Promise.all([
       page.waitForResponse(
-        (res) => res.request().method() === "POST" && res.url().includes("/clients") && res.ok(),
+        (res) => res.request().method() === "POST" && res.url().includes("clients"),
         { timeout: 15000 }
       ),
       tenantDashboard.addClient(originalClient),
     ]);
+
+    // Ensure backend returned a successful status code (200, 201, etc.)
+    expect(response.status()).toBeLessThan(400);
 
     const clientRow = tenantDashboard.getClientRowByName(originalClient.name);
     await expect(clientRow).toBeVisible({ timeout: 10000 });
