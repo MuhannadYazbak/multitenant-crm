@@ -10,23 +10,23 @@ export default defineConfig({
   },
   webServer: [
     {
-      // Run uvicorn directly from the virtual environment without needing 'activate'
+      // Local Windows uses its local .venv, Linux CI uses globally installed uvicorn
       command: process.platform === 'win32'
         ? '.venv\\Scripts\\uvicorn main:app --port 8000'
-        : '../../backend/.venv/bin/uvicorn main:app --port 8000',
+        : 'uvicorn main:app --port 8000',
       cwd: '../../backend',
       port: 8000,
       reuseExistingServer: !process.env.CI,
       timeout: 120 * 1000,
     },
-  {
-    command: 'npm run build && npm run start', // or 'npm run dev'
-    cwd: '.',
-    port: 3000,
-    reuseExistingServer: !process.env.CI,
-    timeout: 120 * 1000, // 2 minutes max
-  },
-],
+    {
+      command: 'npm run build && npm run start',
+      cwd: '.',
+      port: 3000,
+      reuseExistingServer: !process.env.CI,
+      timeout: 120 * 1000,
+    },
+  ],
   projects: [
     {
       name: "chromium",
