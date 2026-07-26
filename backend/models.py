@@ -1,6 +1,7 @@
 # backend/models.py
 import datetime
-from sqlalchemy import Column, Integer, String, ForeignKey, DateTime, Numeric, func
+from sqlalchemy import Column, Integer, String, ForeignKey, DateTime, Numeric, Boolean, Text
+from sqlalchemy import func
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import relationship
 from database import Base
@@ -53,11 +54,11 @@ class InsurancePolicy(Base):
 
     client = relationship("Client", back_populates="policies")
 
-# --- LEGAL VERTICAL ---
+# --- LEGAL VERTICAL EXTENSIONS ---
+
 class LegalCase(Base):
     __tablename__ = "legal_cases"
 
-    # FIXED: removed primary_order=True
     id = Column(Integer, primary_key=True, index=True)
     case_number = Column(String, nullable=False, index=True)
     case_type = Column(String, nullable=False)
@@ -66,4 +67,52 @@ class LegalCase(Base):
     client_id = Column(Integer, ForeignKey("clients.id", ondelete="CASCADE"), nullable=False)
     created_at = Column(DateTime, default=datetime.datetime.utcnow)
 
+    # Relationships
     client = relationship("Client", back_populates="legal_cases")
+    notes = relationship("CaseNote", back_populates="case", cascade="all, delete-orphan")
+    documents = relationship("CaseDocument", back_populates="case", cascade="all, delete-orphan")
+    billing_entries = relationship("CaseBillingEntry", back_populates="case", cascade="all, delete-orphan")
+
+
+class CaseNote(Base):
+    __tablename__ = "case_notes"
+
+    id = Column(Integer, primary_key=True, index=True)
+    case_id = Column(Integer, ForeignKey("legal_cases.id", ondelete="CASCADE"), nullable=False)
+    author_name = Column(String, nullable=False, default="System User")
+    note_type = Column(String, default="General")  # e.g., 'Client Call', 'Court Update', 'Strategy'
+    content = Column(Text, nullable=False)
+    is_pinned = Column(Boolean, default=False)
+    created_at = Column(DateTime, default=datetime.datetime.utcnow)
+
+    case = relationship("LegalCase", back_populates="notes")
+
+
+class CaseDocument(Base):
+    __tablename__ = "case_documents"
+
+    id = Column(Integer, primary_key=True, index=True)
+    case_id = Column(Integer, ForeignKey("legal_cases.id", ondelete="CASCADE"), nullable=False)
+    file_name = Column(String, nullable=False)
+    file_path = Column(String, nullable=False)  # Local storage path or S3 key
+    file_category = Column(String, default="General")  # e.g., 'Pleading', 'Evidence', 'Contract'
+    file_size_bytes = Column(Integer, nullable=True)
+    is_archived = Column(Boolean, default=False)
+    uploaded_at = Column(DateTime, default=datetime.datetime.utcnow)
+
+    case = relationship("LegalCase", back_populates="documents")
+
+
+class CaseBillingEntry(Base):
+    __tablename__ = "case_billing_entries"
+
+    id = Column(Integer, primary_key=True, index=True)
+    case_id = Column(Integer, ForeignKey("legal_cases.id", ondelete="CASCADE"), nullable=False)
+    description = Column(String, nullable=False)
+    hours = Column(Numeric(5, 2), nullable=True)  # e.g. 2.50 hours
+    rate = Column(Numeric(10, 2), nullable=True)   # e.g. 150.00 / hour
+    total_amount = Column(Numeric(10, 2), nullable=False)  # Hours * Rate or Flat Fee
+    is_paid = Column(Boolean, default=False)
+    created_at = Column(DateTime, default=datetime.datetime.utcnow)
+
+    case = relationship("LegalCase", back_populates="billing_entries")

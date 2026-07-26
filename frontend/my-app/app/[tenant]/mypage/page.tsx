@@ -39,38 +39,38 @@ export default function Home() {
     };
 
     const handleAddClient = async (e: React.FormEvent) => {
-    e.preventDefault();
+        e.preventDefault();
 
-    const customFieldsObject = customFields.reduce((acc, curr) => {
-        if (curr.key.trim()) {
-            acc[curr.key.trim()] = curr.value.trim();
+        const customFieldsObject = customFields.reduce((acc, curr) => {
+            if (curr.key.trim()) {
+                acc[curr.key.trim()] = curr.value.trim();
+            }
+            return acc;
+        }, {} as Record<string, string>);
+
+        const payload = {
+            name: client.name.trim(),
+            phone: client.phone.trim(),
+            email: client.email.trim(),
+            address: client.address?.trim() || null,
+            status: "active",
+            custom_fields: customFieldsObject,
+        };
+
+        try {
+            await createClient(tenant, payload);
+            const updatedClients = await fetchAllClients(tenant);
+            setClients(updatedClients);
+
+            // RESET & CLOSE FORM
+            setClient({ name: "", phone: "", email: "", address: "" });
+            setCustomFields([]);
+            setIsAddClientOpen(false); // <--- CLOSE FORM ON SUCCESS
+        } catch (error: any) {
+            console.error("Failed to post new client:", error);
+            // Do NOT block tests with unhandled native alerts in CI if possible
         }
-        return acc;
-    }, {} as Record<string, string>);
-
-    const payload = {
-        name: client.name.trim(),
-        phone: client.phone.trim(),
-        email: client.email.trim(),
-        address: client.address?.trim() || null,
-        status: "active",
-        custom_fields: customFieldsObject,
     };
-
-    try {
-        await createClient(tenant, payload);
-        const updatedClients = await fetchAllClients(tenant);
-        setClients(updatedClients);
-
-        // RESET & CLOSE FORM
-        setClient({ name: "", phone: "", email: "", address: "" });
-        setCustomFields([]);
-        setIsAddClientOpen(false); // <--- CLOSE FORM ON SUCCESS
-    } catch (error: any) {
-        console.error("Failed to post new client:", error);
-        // Do NOT block tests with unhandled native alerts in CI if possible
-    }
-};
 
     const filteredClients = useMemo(() => {
         if (!searchQuery.trim()) return clients;
@@ -312,7 +312,7 @@ export default function Home() {
                                         <td className="text-center py-3 px-4 text-gray-700 flex justify-center gap-2">
                                             <button
                                                 className="bg-green-500 hover:bg-green-600 text-white px-2.5 py-1 rounded text-xs font-medium transition"
-                                                onClick={() => router.push(`/${tenant}/mypage/${encodeURIComponent(c.name)}`)}
+                                                onClick={() => router.push(`/${tenant}/mypage/${c.name}`)}
                                             >
                                                 Show
                                             </button>

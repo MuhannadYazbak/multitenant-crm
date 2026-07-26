@@ -124,3 +124,72 @@ class LegalCaseResponse(LegalCaseBase):
 
     class Config:
         from_attributes = True
+
+# --- NOTES SCHEMAS ---
+class CaseNoteBase(BaseModel):
+    content: str
+    note_type: Optional[str] = "General"
+    is_pinned: Optional[bool] = False
+
+class CaseNoteCreate(CaseNoteBase):
+    author_name: Optional[str] = "System User"
+
+class CaseNoteResponse(CaseNoteBase):
+    id: int
+    case_id: int
+    author_name: str
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+# --- DOCUMENTS SCHEMAS ---
+class CaseDocumentBase(BaseModel):
+    file_category: Optional[str] = "General"
+    is_archived: Optional[bool] = False
+
+class CaseDocumentCreate(CaseDocumentBase):
+    file_name: str
+    file_path: str
+    file_size_bytes: Optional[int] = None
+
+class CaseDocumentResponse(CaseDocumentBase):
+    id: int
+    case_id: int
+    file_name: str
+    file_path: str
+    file_size_bytes: Optional[int] = None
+    uploaded_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+# --- BILLING SCHEMAS ---
+class CaseBillingBase(BaseModel):
+    description: str
+    hours: Optional[float] = None
+    rate: Optional[float] = None
+    total_amount: float
+    is_paid: Optional[bool] = False
+
+class CaseBillingCreate(CaseBillingBase):
+    pass
+
+class CaseBillingResponse(CaseBillingBase):
+    id: int
+    case_id: int
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+
+# --- EXPANDED LEGAL CASE RESPONSE ---
+class LegalCaseDetailResponse(LegalCaseResponse):
+    notes: List[CaseNoteResponse] = []
+    documents: List[CaseDocumentResponse] = []
+    billing_entries: List[CaseBillingResponse] = []
+
+    class Config:
+        from_attributes = True

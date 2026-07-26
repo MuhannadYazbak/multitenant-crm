@@ -1,4 +1,6 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+import os
+import shutil
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form, status
 from sqlalchemy.orm import Session
 from sqlalchemy import func
 from typing import List, Dict, Any
@@ -10,14 +12,24 @@ router = APIRouter(
     tags=["Legal Module"]
 )
 
-@router.get("/dashboard/stats")
-def get_legal_dashboard_stats(db: Session = Depends(get_db_for_tenant)) -> Dict[str, Any]:
+# Shared guard check helper
+def check_legal_tenant(db: Session):
     tenant_type = db.info.get("tenant_type", "general")
     if tenant_type != "legal":
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN, 
-            detail="Legal module stats are disabled for this tenant"
+            detail="Legal module is disabled for this tenant"
         )
+
+UPLOAD_DIR = "uploaded_documents"
+os.makedirs(UPLOAD_DIR, exist_ok=True)
+
+
+# --- DASHBOARD & EXISTING ENDPOINTS ---
+
+@router.get("/dashboard/stats")
+def get_legal_dashboard_stats(db: Session = Depends(get_db_for_tenant)) -> Dict[str, Any]:
+    check_legal_tenant(db)
 
     total_cases = db.query(models.LegalCase).count()
 
@@ -71,25 +83,16 @@ def get_legal_dashboard_stats(db: Session = Depends(get_db_for_tenant)) -> Dict[
         "recent_cases": recent_cases
     }
 
+
 @router.get("/clients/{client_id}/cases", response_model=List[schemas.LegalCaseResponse])
 def get_client_cases(client_id: int, db: Session = Depends(get_db_for_tenant)):
-    tenant_type = db.info.get("tenant_type", "general")
-    if tenant_type != "legal":
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN, 
-            detail="Legal module is disabled for this tenant"
-        )
-    
+    check_legal_tenant(db)
     return db.query(models.LegalCase).filter(models.LegalCase.client_id == client_id).all()
+
 
 @router.post("/cases", response_model=schemas.LegalCaseResponse)
 def create_case(case_data: schemas.LegalCaseCreate, db: Session = Depends(get_db_for_tenant)):
-    tenant_type = db.info.get("tenant_type", "general")
-    if tenant_type != "legal":
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN, 
-            detail="Legal module is disabled for this tenant"
-        )
+    check_legal_tenant(db)
 
     dumped = case_data.model_dump() if hasattr(case_data, "model_dump") else case_data.dict()
     new_case = models.LegalCase(**dumped)
@@ -116,12 +119,140 @@ def create_case(case_data: schemas.LegalCaseCreate, db: Session = Depends(get_db
         "created_at": res_created_at
     }
 
-@router.delete("/cases/{case_id}", status_code=status.HTTP_204_NO_CONTENT)
+
+@router.delete("/cases/{case_id}", status_code=status.HTTP_200_OK)
 def delete_case(case_id: int, db: Session = Depends(get_db_for_tenant)):
+    check_legal_tenant(db)
     case = db.query(models.LegalCase).filter(models.LegalCase.id == case_id).first()
     if not case:
         raise HTTPException(status_code=404, detail="Case not found")
     
-    db.delete(case)
+    # Soft delete / Archive
+    case.status = "Archived"
+    db.commit()
+    return {"message": "Case archived successfully"}
+
+
+# ==========================================
+# NEW EXTENSIONS: DETAILS, NOTES, DOCS, BILLING
+# ==========================================
+
+@router.get("/cases/{case_id}", response_model=schemas.LegalCaseDetailResponse)
+def get_case_details(case_id: int, db: Session = Depends(get_db_for_tenant)):
+    check_legal_tenant(db)
+    case = db.query(models.LegalCase).filter(models.LegalCase.id == case_id).first()
+    if not case:
+        raise HTTPException(status_code=404, detail="Case not found")
+    return case
+
+
+@router.post("/cases/{case_id}/notes", response_model=schemas.CaseNoteResponse, status_code=status.HTTP_201_CREATED)
+def add_case_note(case_id: int, payload: schemas.CaseNoteCreate, db: Session = Depends(get_db_for_tenant)):
+    check_legal_tenant(db)
+    case = db.query(models.LegalCase).filter(models.LegalCase.id == case_id).first()
+    if not case:
+        raise HTTPException(status_code=404, detail="Case not found")
+
+    dumped = payload.model_dump() if hasattr(payload, "model_dump") else payload.dict()
+    note = models.CaseNote(case_id=case_id, **dumped)
+    db.add(note)
+    db.commit()
+    db.refresh(note)
+    return note
+
+
+@router.post("/cases/{case_id}/documents", response_model=schemas.CaseDocumentResponse, status_code=status.HTTP_201_CREATED)
+def upload_case_document(
+    case_id: int,
+    file_category: str = Form("General"),
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db_for_tenant)
+):
+    check_legal_tenant(db)
+    case = db.query(models.LegalCase).filter(models.LegalCase.id == case_id).first()
+    if not case:
+        raise HTTPException(status_code=404, detail="Case not found")
+
+    tenant_slug = db.info.get("tenant_slug", "default_tenant")
+    tenant_dir = os.path.join(UPLOAD_DIR, tenant_slug, f"case_{case_id}")
+    os.makedirs(tenant_dir, exist_ok=True)
+    file_path = os.path.join(tenant_dir, file.filename)
+
+    with open(file_path, "wb") as buffer:
+        shutil.copyfileobj(file.file, buffer)
+
+    file_size = os.path.getsize(file_path)
+
+    doc = models.CaseDocument(
+        case_id=case_id,
+        file_name=file.filename,
+        file_path=file_path,
+        file_category=file_category,
+        file_size_bytes=file_size
+    )
+    db.add(doc)
+    db.commit()
+    db.refresh(doc)
+    return doc
+
+
+@router.post("/cases/{case_id}/billing", response_model=schemas.CaseBillingResponse, status_code=status.HTTP_201_CREATED)
+def add_billing_entry(case_id: int, payload: schemas.CaseBillingCreate, db: Session = Depends(get_db_for_tenant)):
+    check_legal_tenant(db)
+    case = db.query(models.LegalCase).filter(models.LegalCase.id == case_id).first()
+    if not case:
+        raise HTTPException(status_code=404, detail="Case not found")
+
+    dumped = payload.model_dump() if hasattr(payload, "model_dump") else payload.dict()
+    entry = models.CaseBillingEntry(case_id=case_id, **dumped)
+    db.add(entry)
+    db.commit()
+    db.refresh(entry)
+    return entry
+
+# --- SUB-RESOURCE DELETE ENDPOINTS ---
+
+@router.delete("/cases/{case_id}/notes/{note_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_case_note(case_id: int, note_id: int, db: Session = Depends(get_db_for_tenant)):
+    check_legal_tenant(db)
+    note = db.query(models.CaseNote).filter(
+        models.CaseNote.id == note_id, 
+        models.CaseNote.case_id == case_id
+    ).first()
+    if not note:
+        raise HTTPException(status_code=404, detail="Note not found")
+    
+    db.delete(note)  # Or set note.is_deleted = True if you added that column
+    db.commit()
+    return None
+
+
+@router.delete("/cases/{case_id}/documents/{doc_id}", status_code=status.HTTP_200_OK)
+def archive_case_document(case_id: int, doc_id: int, db: Session = Depends(get_db_for_tenant)):
+    check_legal_tenant(db)
+    doc = db.query(models.CaseDocument).filter(
+        models.CaseDocument.id == doc_id, 
+        models.CaseDocument.case_id == case_id
+    ).first()
+    if not doc:
+        raise HTTPException(status_code=404, detail="Document not found")
+    
+    # Toggle or set is_archived
+    doc.is_archived = True
+    db.commit()
+    return {"message": "Document archived"}
+
+
+@router.delete("/cases/{case_id}/billing/{billing_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_billing_entry(case_id: int, billing_id: int, db: Session = Depends(get_db_for_tenant)):
+    check_legal_tenant(db)
+    entry = db.query(models.CaseBillingEntry).filter(
+        models.CaseBillingEntry.id == billing_id, 
+        models.CaseBillingEntry.case_id == case_id
+    ).first()
+    if not entry:
+        raise HTTPException(status_code=404, detail="Billing entry not found")
+    
+    db.delete(entry)
     db.commit()
     return None

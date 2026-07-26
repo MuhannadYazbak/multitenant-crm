@@ -97,20 +97,50 @@ def onboard_tenant(
         # 3. Conditional sub-tables
         tenant_type_clean = payload.tenant_type.lower()
 
-        if tenant_type_clean == "legal":
-            db.execute(
-                text(f"""
+        if tenant_type_clean == "legal" or tenant_type_clean == "general":
+            db.execute(text(f"""
                 CREATE TABLE IF NOT EXISTS "{schema_name}".legal_cases (
                     id SERIAL PRIMARY KEY,
-                    case_number VARCHAR(255),
-                    case_type VARCHAR(255),
+                    case_number VARCHAR(255) NOT NULL,
+                    case_type VARCHAR(255) NOT NULL,
                     court VARCHAR(255),
-                    status VARCHAR(255),
+                    status VARCHAR(255) DEFAULT 'Open',
                     client_id INT REFERENCES "{schema_name}".clients(id) ON DELETE CASCADE,
-                    created_at TIMESTAMP WITHOUT TIME ZONE DEFAULT CURRENT_TIMESTAMP
-                )
-            """)
-            )
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                );
+
+                CREATE TABLE IF NOT EXISTS "{schema_name}".case_notes (
+                    id SERIAL PRIMARY KEY,
+                    case_id INT REFERENCES "{schema_name}".legal_cases(id) ON DELETE CASCADE,
+                    author_name VARCHAR(255) DEFAULT 'System User',
+                    note_type VARCHAR(50) DEFAULT 'General',
+                    content TEXT NOT NULL,
+                    is_pinned BOOLEAN DEFAULT FALSE,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                );
+
+                CREATE TABLE IF NOT EXISTS "{schema_name}".case_documents (
+                    id SERIAL PRIMARY KEY,
+                    case_id INT REFERENCES "{schema_name}".legal_cases(id) ON DELETE CASCADE,
+                    file_name VARCHAR(255) NOT NULL,
+                    file_path VARCHAR(500) NOT NULL,
+                    file_category VARCHAR(100) DEFAULT 'General',
+                    file_size_bytes INT,
+                    is_archived BOOLEAN DEFAULT FALSE,
+                    uploaded_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                );
+
+                CREATE TABLE IF NOT EXISTS "{schema_name}".case_billing_entries (
+                    id SERIAL PRIMARY KEY,
+                    case_id INT REFERENCES "{schema_name}".legal_cases(id) ON DELETE CASCADE,
+                    description VARCHAR(255) NOT NULL,
+                    hours NUMERIC(5, 2),
+                    rate NUMERIC(10, 2),
+                    total_amount NUMERIC(10, 2) NOT NULL,
+                    is_paid BOOLEAN DEFAULT FALSE,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                );
+            """))
 
         elif tenant_type_clean == "insurance":
             db.execute(

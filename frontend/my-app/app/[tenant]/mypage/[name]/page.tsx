@@ -11,8 +11,8 @@ import LegalCases from "@/app/components/LegalCases";
 export default function ClientDetailPage() {
     const params = useParams();
     const router = useRouter();
-
-    const clientName = params?.name as string;
+    const rawClientName = params?.name as string;
+    const clientName = rawClientName ? decodeURIComponent(rawClientName) : "";
     const tenant = params?.tenant as string;
 
     const [client, setClient] = useState<Client | null>(null);
@@ -129,6 +129,7 @@ export default function ClientDetailPage() {
         delete updated[keyToRemove];
         setEditForm({ ...editForm, custom_fields: updated });
     };
+    
 
     return (
         <div className="min-h-screen bg-slate-50">

@@ -1,15 +1,15 @@
 // lib/api.ts
 import type { InsurancePolicy } from "@/app/types/insurancePolicy";
 import type { DashboardStats } from "@/app/types/dashBoard";
-import type { LegalCase } from "@/app/types/legalCase";
-import type  { CreateTenantPayload } from "@/app/types/tenant";
+import type { LegalCase, CaseNote, CaseDocument, CaseBillingEntry } from "@/app/types/legal";
+import type { CreateTenantPayload } from "@/app/types/tenant";
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8000";
 export const fetchDashboardData = async (tenantName: string) => {
   const response = await fetch("http://127.0.0.1:8000/api/dashboard/clients", {
     method: "GET",
     headers: {
       "Content-Type": "application/json",
-      "X-Tenant": tenantName, 
+      "X-Tenant": tenantName,
     },
   });
 
@@ -21,22 +21,22 @@ export const fetchDashboardData = async (tenantName: string) => {
 };
 
 export async function fetchClientDetails(tenant: string, clientName: string) {
-    // Decode first to ensure clean raw string, then encode ONCE for URL path
-    const cleanName = decodeURIComponent(clientName);
-    const encodedName = encodeURIComponent(cleanName);
+  // Decode first to ensure clean raw string, then encode ONCE for URL path
+  const cleanName = decodeURIComponent(clientName);
+  const encodedName = encodeURIComponent(cleanName);
 
-    const res = await fetch(`${API_BASE_URL}/api/clients/${encodedName}`, {
-        headers: {
-            "Content-Type": "application/json",
-            "X-Tenant": tenant,
-        },
-    });
+  const res = await fetch(`${API_BASE_URL}/api/clients/${encodedName}`, {
+    headers: {
+      "Content-Type": "application/json",
+      "X-Tenant": tenant,
+    },
+  });
 
-    if (!res.ok) {
-        throw new Error(`Failed to fetch client details (${res.status})`);
-    }
+  if (!res.ok) {
+    throw new Error(`Failed to fetch client details (${res.status})`);
+  }
 
-    return await res.json();
+  return await res.json();
 }
 
 export const fetchAllClients = async (tenantName: string) => {
@@ -192,7 +192,7 @@ export async function fetchClientCases(tenant: string, clientId: number): Promis
 }
 
 export async function createCase(
-  tenant: string, 
+  tenant: string,
   caseData: { case_number: string; case_type: string; court?: string; client_id: number }
 ) {
   const res = await fetch(`${API_BASE_URL}/api/legal/cases`, {
@@ -246,4 +246,161 @@ export async function createTenant(payload: CreateTenantPayload, adminSecret: st
   }
 
   return await response.json();
+}
+
+export async function createLegalCase(
+  tenant: string, 
+  caseData: { client_id: number; case_number: string; case_type: string; court?: string; status?: string }
+) {
+  const res = await fetch(`${API_BASE_URL}/api/legal/cases`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "X-Tenant": tenant,
+    },
+    body: JSON.stringify(caseData),
+  });
+
+  if (!res.ok) {
+    const errorData = await res.json().catch(() => null);
+    throw new Error(errorData?.detail || "Failed to create case");
+  }
+
+  return res.json();
+}
+
+export async function fetchCaseDetails(tenant: string, caseId: number): Promise<LegalCase> {
+  const res = await fetch(`${API_BASE_URL}/api/legal/cases/${caseId}`, {
+    headers: { "X-Tenant": tenant },
+  });
+
+  if (!res.ok) {
+    throw new Error("Failed to fetch case details");
+  }
+  return res.json();
+}
+
+/**
+ * Add a new note to a case
+ */
+export async function createCaseNote(
+  tenant: string,
+  caseId: number,
+  noteData: { author_name: string; note_type: string; content: string; is_pinned?: boolean }
+): Promise<CaseNote> {
+  const res = await fetch(`${API_BASE_URL}/api/legal/cases/${caseId}/notes`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "X-Tenant": tenant,
+    },
+    body: JSON.stringify(noteData),
+  });
+
+  if (!res.ok) {
+    const errorData = await res.json().catch(() => null);
+    throw new Error(errorData?.detail || "Failed to create case note");
+  }
+
+  return res.json();
+}
+
+/**
+ * Upload a document to a case (multipart/form-data)
+ */
+export async function uploadCaseDocument(
+  tenant: string,
+  caseId: number,
+  file: File,
+  fileCategory: string = "General"
+): Promise<CaseDocument> {
+  const formData = new FormData();
+  formData.append("file", file);
+  formData.append("file_category", fileCategory);
+
+  const res = await fetch(`${API_BASE_URL}/api/legal/cases/${caseId}/documents`, {
+    method: "POST",
+    headers: {
+      "X-Tenant": tenant, // Do NOT set Content-Type header here; browser auto-sets boundary for FormData
+    },
+    body: formData,
+  });
+
+  if (!res.ok) {
+    const errorData = await res.json().catch(() => null);
+    throw new Error(errorData?.detail || "Failed to upload document");
+  }
+
+  return res.json();
+}
+
+/**
+ * Log a billing entry for a case
+ */
+export async function createCaseBillingEntry(
+  tenant: string,
+  caseId: number,
+  billingData: { description: string; hours: number; rate: number; total_amount: number; is_paid?: boolean }
+): Promise<CaseBillingEntry> {
+  const res = await fetch(`${API_BASE_URL}/api/legal/cases/${caseId}/billing`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "X-Tenant": tenant,
+    },
+    body: JSON.stringify(billingData),
+  });
+
+  if (!res.ok) {
+    const errorData = await res.json().catch(() => null);
+    throw new Error(errorData?.detail || "Failed to create billing entry");
+  }
+
+  return res.json();
+}
+
+// --- SOFT DELETE / ARCHIVE HELPERS ---
+
+export async function deleteCaseNote(tenant: string, caseId: number, noteId: number): Promise<void> {
+  const res = await fetch(`${API_BASE_URL}/api/legal/cases/${caseId}/notes/${noteId}`, {
+    method: "DELETE",
+    headers: { "X-Tenant": tenant },
+  });
+  if (!res.ok) throw new Error("Failed to delete note");
+}
+
+export async function archiveCaseDocument(tenant: string, caseId: number, docId: number): Promise<void> {
+  const res = await fetch(`${API_BASE_URL}/api/legal/cases/${caseId}/documents/${docId}`, {
+    method: "DELETE", // Matches @router.delete in Python
+    headers: {
+      "X-Tenant": tenant,
+    },
+  });
+
+  if (!res.ok) {
+    const errorData = await res.json().catch(() => null);
+    throw new Error(errorData?.detail || "Failed to archive document");
+  }
+}
+
+export async function deleteCaseBillingEntry(tenant: string, caseId: number, entryId: number): Promise<void> {
+  const res = await fetch(`${API_BASE_URL}/api/legal/cases/${caseId}/billing/${entryId}`, {
+    method: "DELETE",
+    headers: { "X-Tenant": tenant },
+  });
+  if (!res.ok) throw new Error("Failed to delete billing entry");
+}
+
+export async function archiveLegalCase(tenant: string, caseId: number): Promise<void> {
+    const res = await fetch(`${API_BASE_URL}/api/legal/cases/${caseId}`, {
+        method: "DELETE",
+        headers: {
+            "X-Tenant": tenant,
+        },
+    });
+
+    if (!res.ok) {
+        const errorData = await res.json().catch(() => null);
+        throw new Error(errorData?.detail || "Failed to archive case");
+    }
 }

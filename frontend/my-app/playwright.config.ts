@@ -10,7 +10,7 @@ export default defineConfig({
   },
   webServer: [
   {
-    command: 'uvicorn main:app --port 8000',
+    command: '.venv\\Scripts\\activate && uvicorn main:app --port 8000',
     cwd: '../../backend',
     port: 8000,
     reuseExistingServer: !process.env.CI,
