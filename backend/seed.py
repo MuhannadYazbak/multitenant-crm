@@ -77,7 +77,7 @@ def reset_and_seed():
                     CREATE TABLE IF NOT EXISTS case_notes (
                         id SERIAL PRIMARY KEY,
                         case_id INT REFERENCES legal_cases(id) ON DELETE CASCADE,
-                        author_name VARCHAR(100) NOT NULL
+                        author_name VARCHAR(100) NOT NULL,
                         content TEXT NOT NULL,
                         is_archived BOOLEAN DEFAULT FALSE NOT NULL,
                         archived_at TIMESTAMP,
