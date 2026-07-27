@@ -60,14 +60,12 @@ def reset_and_seed():
                 conn.execute(text("""
                     CREATE TABLE IF NOT EXISTS legal_cases (
                         id SERIAL PRIMARY KEY,
-                        client_id INT REFERENCES clients(id) ON DELETE CASCADE,
                         case_number VARCHAR(100) NOT NULL,
                         case_type VARCHAR(100) NOT NULL,
                         court VARCHAR(255),
                         status VARCHAR(50) DEFAULT 'Open',
-                        is_archived BOOLEAN DEFAULT FALSE NOT NULL,
-                        archived_at TIMESTAMP,
-                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                        client_id INT REFERENCES clients(id) ON DELETE CASCADE,
+                        created_at TIMESTAMP WITHOUT TIME ZONE DEFAULT CURRENT_TIMESTAMP
                     );
                 """))
 
@@ -76,11 +74,11 @@ def reset_and_seed():
                     CREATE TABLE IF NOT EXISTS case_notes (
                         id SERIAL PRIMARY KEY,
                         case_id INT REFERENCES legal_cases(id) ON DELETE CASCADE,
-                        author_name VARCHAR(100) NOT NULL,
+                        author_name VARCHAR(100) NOT NULL DEFAULT 'System User',
+                        note_type VARCHAR(50) DEFAULT 'General',
                         content TEXT NOT NULL,
-                        is_archived BOOLEAN DEFAULT FALSE NOT NULL,
-                        archived_at TIMESTAMP,
-                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                        is_pinned BOOLEAN DEFAULT FALSE,
+                        created_at TIMESTAMP WITHOUT TIME ZONE DEFAULT CURRENT_TIMESTAMP
                     );
                 """))
 
@@ -91,27 +89,27 @@ def reset_and_seed():
                         case_id INT REFERENCES legal_cases(id) ON DELETE CASCADE,
                         file_name VARCHAR(255) NOT NULL,
                         file_path VARCHAR(500) NOT NULL,
-                        category VARCHAR(100) DEFAULT 'General',
-                        is_archived BOOLEAN DEFAULT FALSE NOT NULL,
-                        archived_at TIMESTAMP,
-                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                        file_type VARCHAR(50),
+                        file_size_bytes BIGINT,
+                        file_category VARCHAR(50) DEFAULT 'General',
+                        uploaded_at TIMESTAMP WITHOUT TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+                        is_archived BOOLEAN DEFAULT FALSE
                     );
                 """))
 
                 # Legal Case Billing Entries
                 conn.execute(text("""
-                    CREATE TABLE IF NOT EXISTS case_billing (
+                    CREATE TABLE IF NOT EXISTS case_billing_entries (
                         id SERIAL PRIMARY KEY,
                         case_id INT REFERENCES legal_cases(id) ON DELETE CASCADE,
                         description VARCHAR(255) NOT NULL,
-                        amount NUMERIC(10, 2) NOT NULL,
-                        hours_spent NUMERIC(5, 2) DEFAULT 0.0,
-                        is_archived BOOLEAN DEFAULT FALSE NOT NULL,
-                        archived_at TIMESTAMP,
-                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                        hours NUMERIC(6, 2),
+                        rate NUMERIC(10, 2),
+                        total_amount NUMERIC(10, 2) NOT NULL,
+                        is_paid BOOLEAN DEFAULT FALSE,
+                        created_at TIMESTAMP WITHOUT TIME ZONE DEFAULT CURRENT_TIMESTAMP
                     );
                 """))
-
             conn.commit()
 
     print("Provisioning tenant schemas according to vertical types...")
@@ -160,17 +158,7 @@ def reset_and_seed():
             INSERT INTO clients (id, name, phone, email, address, status, custom_fields) 
             VALUES (1, 'Bob Johnson', '050-333-4444', 'bob@company-b.com', '456 Market St', 'active', '{}');
             
-            INSERT INTO insurance_policies (client_id, policy_number, coverage_amount)
-            VALUES (1, 'POL-GEN-2002', 250000.00);
-            
-            INSERT INTO legal_cases (id, client_id, case_number, case_type, court, status)
-            VALUES (1, 1, 'CASE-GEN-200', 'Contract Review', 'Arbitration', 'Open');
-
-            INSERT INTO case_notes (case_id, author_name, content) 
-            VALUES (1, 'System Admin', 'Initial contract review completed.');
-
             SELECT setval(pg_get_serial_sequence('clients', 'id'), (SELECT MAX(id) FROM clients));
-            SELECT setval(pg_get_serial_sequence('legal_cases', 'id'), (SELECT MAX(id) FROM legal_cases));
         """))
         conn.commit()
 
@@ -184,17 +172,20 @@ def reset_and_seed():
             INSERT INTO legal_cases (id, client_id, case_number, case_type, court, status)
             VALUES (1, 1, 'CASE-LEG-3001', 'Civil Litigation', 'District Magistrate Court', 'Open');
 
-            INSERT INTO case_notes (case_id, author_name, content) 
-            VALUES (1, 'System Admin', 'Initial client consultation logged.');
+            INSERT INTO case_notes (case_id, author_name, note_type, content, is_pinned) 
+            VALUES (1, 'System User', 'General', 'Initial client consultation logged.', false);
 
-            INSERT INTO case_documents (case_id, file_name, file_path, category) 
-            VALUES (1, 'engagement_letter.pdf', '/uploads/engagement_letter.pdf', 'Contract');
+            INSERT INTO case_documents (case_id, file_name, file_path, file_category, file_size_bytes, is_archived) 
+            VALUES (1, 'engagement_letter.pdf', '/uploads/engagement_letter.pdf', 'Contract', 1024, false);
 
-            INSERT INTO case_billing (case_id, description, amount, hours_spent) 
-            VALUES (1, 'Initial consultation fee', 250.00, 1.5);
+            INSERT INTO case_billing_entries (case_id, description, hours, rate, total_amount, is_paid) 
+            VALUES (1, 'Initial consultation fee', 1.5, 166.67, 250.00, false);
 
             SELECT setval(pg_get_serial_sequence('clients', 'id'), (SELECT MAX(id) FROM clients));
             SELECT setval(pg_get_serial_sequence('legal_cases', 'id'), (SELECT MAX(id) FROM legal_cases));
+            SELECT setval(pg_get_serial_sequence('case_notes', 'id'), (SELECT MAX(id) FROM case_notes));
+            SELECT setval(pg_get_serial_sequence('case_documents', 'id'), (SELECT MAX(id) FROM case_documents));
+            SELECT setval(pg_get_serial_sequence('case_billing_entries', 'id'), (SELECT MAX(id) FROM case_billing_entries));
         """))
         conn.commit()
 
