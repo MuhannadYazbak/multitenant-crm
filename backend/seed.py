@@ -1,4 +1,3 @@
-# seed.py
 from database import engine, SessionLocal, Base
 import models
 from sqlalchemy import text
@@ -167,7 +166,8 @@ def reset_and_seed():
             INSERT INTO legal_cases (id, client_id, case_number, case_type, court, status)
             VALUES (1, 1, 'CASE-GEN-200', 'Contract Review', 'Arbitration', 'Open');
 
-            INSERT INTO case_notes (case_id, content) VALUES (1, 'Initial contract review completed.');
+            INSERT INTO case_notes (case_id, author_name, content) 
+            VALUES (1, 'System Admin', 'Initial contract review completed.');
 
             SELECT setval(pg_get_serial_sequence('clients', 'id'), (SELECT MAX(id) FROM clients));
             SELECT setval(pg_get_serial_sequence('legal_cases', 'id'), (SELECT MAX(id) FROM legal_cases));
@@ -184,9 +184,14 @@ def reset_and_seed():
             INSERT INTO legal_cases (id, client_id, case_number, case_type, court, status)
             VALUES (1, 1, 'CASE-LEG-3001', 'Civil Litigation', 'District Magistrate Court', 'Open');
 
-            INSERT INTO case_notes (case_id, content) VALUES (1, 'Initial client consultation logged.');
-            INSERT INTO case_documents (case_id, file_name, file_path, category) VALUES (1, 'engagement_letter.pdf', '/uploads/engagement_letter.pdf', 'Contract');
-            INSERT INTO case_billing (case_id, description, amount, hours_spent) VALUES (1, 'Initial consultation fee', 250.00, 1.5);
+            INSERT INTO case_notes (case_id, author_name, content) 
+            VALUES (1, 'System Admin', 'Initial client consultation logged.');
+
+            INSERT INTO case_documents (case_id, file_name, file_path, category) 
+            VALUES (1, 'engagement_letter.pdf', '/uploads/engagement_letter.pdf', 'Contract');
+
+            INSERT INTO case_billing (case_id, description, amount, hours_spent) 
+            VALUES (1, 'Initial consultation fee', 250.00, 1.5);
 
             SELECT setval(pg_get_serial_sequence('clients', 'id'), (SELECT MAX(id) FROM clients));
             SELECT setval(pg_get_serial_sequence('legal_cases', 'id'), (SELECT MAX(id) FROM legal_cases));
