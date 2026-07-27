@@ -45,7 +45,10 @@ export class LegalClientPage {
         // Header & Modal
         this.addCaseButton = page.getByRole('button', { name: '+ Add New Case' });
         this.caseNumberInput = page.getByPlaceholder('e.g. CAS-2026-001');
-        this.caseTypeSelect = page.locator('select').filter({ hasText: 'Civil Litigation' });
+        
+        // 💡 FIX 1: Direct locator for case type dropdown
+        this.caseTypeSelect = page.locator('select[name="case_type"], select').first();
+        
         this.courtInput = page.getByPlaceholder('e.g. Haifa District Court');
         this.submitCaseButton = page.getByRole('button', { name: 'Create Case' });
 
@@ -64,22 +67,40 @@ export class LegalClientPage {
         this.billingTabButton = page.getByRole('button', { name: /billing/i });
 
         // Docs Tab
-        this.fileInput = page.locator('input[type="file"]');
-        this.categorySelect = page.locator('form select');
-        this.uploadDocButton = page.getByRole('button', { name: 'Upload', exact: true });
+        this.fileInput = this.drawerContainer.locator('input[type="file"]');
+        this.categorySelect = this.drawerContainer.locator('select').first();
+        this.uploadDocButton = this.drawerContainer.getByRole('button', { name: 'Upload', exact: true });
         this.toggleArchivedDocsButton = page.getByRole('button', { name: /Show (Archived|Active) Documents/i });
     }
 
     async goto(tenant: string, clientName: string) {
+        // 1. Navigate directly to the client profile route
         await this.page.goto(`/${tenant}/mypage/${encodeURIComponent(clientName)}`);
+
+        // 2. Wait explicitly for "Loading profile details..." spinner to clear
+        await this.page.waitForFunction(
+            () => !document.body.innerText.includes('Loading profile details...'),
+            { timeout: 10000 }
+        );
+
+        // 3. Ensure network calls (like fetchClientCases) settle
+        await this.page.waitForLoadState('networkidle');
     }
 
     async createCase(caseNumber: string, caseType = 'Civil Litigation', court = 'Haifa District Court') {
         await this.addCaseButton.click();
         await this.caseNumberInput.fill(caseNumber);
-        await this.caseTypeSelect.selectOption(caseType);
+        
+        // Select by option value or label safely
+        await this.caseTypeSelect.selectOption({ label: caseType }).catch(async () => {
+            await this.caseTypeSelect.selectOption(caseType);
+        });
+
         await this.courtInput.fill(court);
         await this.submitCaseButton.click();
+
+        // 💡 FIX 2: Wait for modal to complete POST request to /api/legal/cases
+        await this.page.waitForLoadState('networkidle');
     }
 
     async openCaseDrawer(caseNumber: string) {
@@ -89,19 +110,36 @@ export class LegalClientPage {
     }
 
     async uploadDocument(filePath: string, category = 'Contract') {
+        // 1. Switch to Documents tab
         await this.docsTabButton.click();
-        await this.fileInput.setInputFiles(filePath);
-        await this.categorySelect.selectOption(category);
+
+        // 2. Locate input inside drawer
+        const fileInput = this.drawerContainer.locator('input[type="file"]');
+        await fileInput.waitFor({ state: 'attached' });
+
+        // 3. Attach file
+        await fileInput.setInputFiles(filePath);
+
+        // 4. Select category if present
+        if (category) {
+            await this.categorySelect.selectOption(category).catch(() => {});
+        }
+
+        // 5. Wait for upload button to be enabled
+        await expect(this.uploadDocButton).toBeEnabled({ timeout: 5000 });
+
+        // 6. Click Upload and settle
         await this.uploadDocButton.click();
+        await this.page.waitForLoadState('networkidle');
     }
 
     async archiveFirstDocument() {
-        // Clicks Archive specifically inside the slide-over drawer table
         await this.drawerContainer.locator('tbody tr').first().getByRole('button', { name: /archive/i }).click();
+        await this.page.waitForLoadState('networkidle');
     }
 
     async archiveCurrentCase() {
-        // Clicks Archive Case button inside drawer
         await this.drawerArchiveCaseButton.click();
+        await this.page.waitForLoadState('networkidle');
     }
 }

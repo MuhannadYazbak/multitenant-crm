@@ -73,88 +73,111 @@ def onboard_tenant(
     raw_slug = payload.company_name.lower().replace("-", "_").replace(" ", "_")
     schema_name = f"tenant_{raw_slug}"
     hashed_pwd = hash_password(payload.password)
+    tenant_type_clean = payload.tenant_type.lower()
 
     try:
-        # 1. Create Schema
+        # 1. Create Dedicated Schema
         db.execute(text(f'CREATE SCHEMA IF NOT EXISTS "{schema_name}"'))
 
-        # 2. Base clients table
+        # 2. Base Clients Table (All tenants get this)
         db.execute(
             text(f"""
             CREATE TABLE IF NOT EXISTS "{schema_name}".clients (
                 id SERIAL PRIMARY KEY,
-                name VARCHAR(255) NOT NULL,
-                phone VARCHAR(50),
-                email VARCHAR(255),
-                address TEXT,
+                name VARCHAR(100) NOT NULL,
+                phone VARCHAR(50) NOT NULL,
+                email VARCHAR(100) NOT NULL,
+                address VARCHAR(250),
                 status VARCHAR(50) DEFAULT 'active',
-                custom_fields JSONB DEFAULT '{{}}'::jsonb,
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-            )
+                custom_fields JSONB NOT NULL DEFAULT '{{}}'::jsonb
+            );
         """)
         )
 
-        # 3. Conditional sub-tables
-        tenant_type_clean = payload.tenant_type.lower()
-
-        if tenant_type_clean == "legal" or tenant_type_clean == "general":
+        # 3. Conditional Vertical Tables
+        if tenant_type_clean == "legal":
             db.execute(text(f"""
                 CREATE TABLE IF NOT EXISTS "{schema_name}".legal_cases (
                     id SERIAL PRIMARY KEY,
-                    case_number VARCHAR(255) NOT NULL,
-                    case_type VARCHAR(255) NOT NULL,
+                    client_id INT NOT NULL REFERENCES "{schema_name}".clients(id) ON DELETE CASCADE,
+                    case_number VARCHAR(100) NOT NULL,
+                    case_type VARCHAR(100) NOT NULL,
                     court VARCHAR(255),
-                    status VARCHAR(255) DEFAULT 'Open',
-                    client_id INT REFERENCES "{schema_name}".clients(id) ON DELETE CASCADE,
-                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-                );
-
-                CREATE TABLE IF NOT EXISTS "{schema_name}".case_notes (
-                    id SERIAL PRIMARY KEY,
-                    case_id INT REFERENCES "{schema_name}".legal_cases(id) ON DELETE CASCADE,
-                    author_name VARCHAR(255) DEFAULT 'System User',
-                    note_type VARCHAR(50) DEFAULT 'General',
-                    content TEXT NOT NULL,
-                    is_pinned BOOLEAN DEFAULT FALSE,
-                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-                );
-
-                CREATE TABLE IF NOT EXISTS "{schema_name}".case_documents (
-                    id SERIAL PRIMARY KEY,
-                    case_id INT REFERENCES "{schema_name}".legal_cases(id) ON DELETE CASCADE,
-                    file_name VARCHAR(255) NOT NULL,
-                    file_path VARCHAR(500) NOT NULL,
-                    file_category VARCHAR(100) DEFAULT 'General',
-                    file_size_bytes INT,
-                    is_archived BOOLEAN DEFAULT FALSE,
-                    uploaded_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-                );
-
-                CREATE TABLE IF NOT EXISTS "{schema_name}".case_billing_entries (
-                    id SERIAL PRIMARY KEY,
-                    case_id INT REFERENCES "{schema_name}".legal_cases(id) ON DELETE CASCADE,
-                    description VARCHAR(255) NOT NULL,
-                    hours NUMERIC(5, 2),
-                    rate NUMERIC(10, 2),
-                    total_amount NUMERIC(10, 2) NOT NULL,
-                    is_paid BOOLEAN DEFAULT FALSE,
+                    status VARCHAR(50) DEFAULT 'Open',
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                 );
             """))
 
         elif tenant_type_clean == "insurance":
-            db.execute(
-                text(f"""
+            db.execute(text(f"""
                 CREATE TABLE IF NOT EXISTS "{schema_name}".insurance_policies (
                     id SERIAL PRIMARY KEY,
-                    client_id INT REFERENCES "{schema_name}".clients(id) ON DELETE CASCADE,
-                    policy_number VARCHAR(255),
-                    coverage_amount NUMERIC(12, 2)
-                )
-            """)
-            )
+                    client_id INT NOT NULL REFERENCES "{schema_name}".clients(id) ON DELETE CASCADE,
+                    policy_number VARCHAR(100) NOT NULL,
+                    policy_type VARCHAR(100) DEFAULT 'General',
+                    coverage_amount NUMERIC(12, 2),
+                    deductible NUMERIC(10, 2) DEFAULT 0.00,
+                    status VARCHAR(50) DEFAULT 'Active',
+                    start_date TIMESTAMP,
+                    end_date TIMESTAMP,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                );
+            """))
 
-        # 4. Save Tenant Account
+        # 4. Universal Sub-Resource Tables (Provisioned for ALL tenant types)
+        # Dynamic foreign key constraints based on tenant vertical
+        case_fk_clause = f'REFERENCES "{schema_name}".legal_cases(id) ON DELETE CASCADE' if tenant_type_clean == "legal" else ""
+        policy_fk_clause = f'REFERENCES "{schema_name}".insurance_policies(id) ON DELETE CASCADE' if tenant_type_clean == "insurance" else ""
+
+        # A. Notes
+        db.execute(text(f"""
+            CREATE TABLE IF NOT EXISTS "{schema_name}".notes (
+                id SERIAL PRIMARY KEY,
+                author_name VARCHAR(100) NOT NULL DEFAULT 'System User',
+                note_type VARCHAR(50) DEFAULT 'General',
+                content TEXT NOT NULL,
+                is_pinned BOOLEAN DEFAULT FALSE,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                client_id INT REFERENCES "{schema_name}".clients(id) ON DELETE CASCADE,
+                case_id INT {case_fk_clause},
+                policy_id INT {policy_fk_clause}
+            );
+        """))
+
+        # B. Documents
+        db.execute(text(f"""
+            CREATE TABLE IF NOT EXISTS "{schema_name}".documents (
+                id SERIAL PRIMARY KEY,
+                file_name VARCHAR(255) NOT NULL,
+                file_path VARCHAR(500) NOT NULL,
+                file_type VARCHAR(50),
+                file_category VARCHAR(50) DEFAULT 'General',
+                file_size_bytes BIGINT,
+                is_archived BOOLEAN DEFAULT FALSE,
+                uploaded_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                client_id INT REFERENCES "{schema_name}".clients(id) ON DELETE CASCADE,
+                case_id INT {case_fk_clause},
+                policy_id INT {policy_fk_clause}
+            );
+        """))
+
+        # C. Billing Entries
+        db.execute(text(f"""
+            CREATE TABLE IF NOT EXISTS "{schema_name}".billing_entries (
+                id SERIAL PRIMARY KEY,
+                description VARCHAR(255) NOT NULL,
+                hours NUMERIC(6, 2),
+                rate NUMERIC(10, 2),
+                total_amount NUMERIC(10, 2) NOT NULL,
+                is_paid BOOLEAN DEFAULT FALSE,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                client_id INT REFERENCES "{schema_name}".clients(id) ON DELETE CASCADE,
+                case_id INT {case_fk_clause},
+                policy_id INT {policy_fk_clause}
+            );
+        """))
+
+        # 5. Save Global Tenant Account in Public Schema
         new_account = TenantAccount(
             company_name=payload.company_name,
             tenant_type=payload.tenant_type,
@@ -172,7 +195,8 @@ def onboard_tenant(
         raise HTTPException(
             status_code=500, detail=f"Failed to provision tenant: {str(e)}"
         )
-        
+
+
 @router.get("/tenants", response_model=list[TenantResponse])
 def list_tenants(
     db: Session = Depends(get_db),

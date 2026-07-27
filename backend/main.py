@@ -16,6 +16,9 @@ from passlib.context import CryptContext
 from auth_utils import verify_password
 from schemas import TenantLoginRequest
 from models import TenantAccount
+
+models.Base.metadata.create_all(bind=engine)
+
 app = FastAPI()
 
 app.add_middleware(

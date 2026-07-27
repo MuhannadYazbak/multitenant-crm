@@ -4,14 +4,14 @@ import { useState } from 'react';
 import { CaseDocument } from '@/app/types/legal';
 import { uploadCaseDocument, archiveCaseDocument } from '@/app/lib/api';
 
-interface CaseDocumentsTabProps {
+interface DocumentsTabProps {
     caseId: number;
     tenant: string;
     documents: CaseDocument[];
     onDocumentUploaded: () => void;
 }
 
-export default function CaseDocumentsTab({ caseId, tenant, documents, onDocumentUploaded }: CaseDocumentsTabProps) {
+export default function DocumentsTab({ caseId, tenant, documents, onDocumentUploaded }: DocumentsTabProps) {
     const [file, setFile] = useState<File | null>(null);
     const [category, setCategory] = useState('General');
     const [uploading, setUploading] = useState(false);

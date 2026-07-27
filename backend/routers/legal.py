@@ -134,7 +134,7 @@ def delete_case(case_id: int, db: Session = Depends(get_db_for_tenant)):
 
 
 # ==========================================
-# NEW EXTENSIONS: DETAILS, NOTES, DOCS, BILLING
+# DETAILS, NOTES, DOCS, BILLING
 # ==========================================
 
 @router.get("/cases/{case_id}", response_model=schemas.LegalCaseDetailResponse)
@@ -146,22 +146,38 @@ def get_case_details(case_id: int, db: Session = Depends(get_db_for_tenant)):
     return case
 
 
-@router.post("/cases/{case_id}/notes", response_model=schemas.CaseNoteResponse, status_code=status.HTTP_201_CREATED)
-def add_case_note(case_id: int, payload: schemas.CaseNoteCreate, db: Session = Depends(get_db_for_tenant)):
+@router.post("/cases/{case_id}/notes", response_model=schemas.NoteResponse, status_code=status.HTTP_201_CREATED)
+def add_case_note(
+    case_id: int, 
+    payload: schemas.NoteCreate, 
+    db: Session = Depends(get_db_for_tenant) # 👈 FIXED: Uses tenant session!
+):
     check_legal_tenant(db)
+
+    # 1. Fetch case to ensure client_id context exists
     case = db.query(models.LegalCase).filter(models.LegalCase.id == case_id).first()
     if not case:
         raise HTTPException(status_code=404, detail="Case not found")
 
-    dumped = payload.model_dump() if hasattr(payload, "model_dump") else payload.dict()
-    note = models.CaseNote(case_id=case_id, **dumped)
-    db.add(note)
+    # 2. Instantiate Note ORM model using models module prefix
+    new_note = models.Note(
+        client_id=case.client_id,
+        case_id=case.id,
+        author_name=payload.author_name or "System User",
+        note_type=payload.note_type or "General",
+        content=payload.content,
+        is_pinned=payload.is_pinned or False
+    )
+
+    # 3. Add to session, commit, then refresh
+    db.add(new_note)
     db.commit()
-    db.refresh(note)
-    return note
+    db.refresh(new_note)
+
+    return new_note
 
 
-@router.post("/cases/{case_id}/documents", response_model=schemas.CaseDocumentResponse, status_code=status.HTTP_201_CREATED)
+@router.post("/cases/{case_id}/documents", response_model=schemas.DocumentResponse, status_code=status.HTTP_201_CREATED)
 def upload_case_document(
     case_id: int,
     file_category: str = Form("General"),
@@ -183,8 +199,12 @@ def upload_case_document(
 
     file_size = os.path.getsize(file_path)
 
-    doc = models.CaseDocument(
+    # Check if the client actually exists in the clients table
+    client_exists = db.query(models.Client).filter(models.Client.id == case.client_id).first() if case.client_id else None
+
+    doc = models.Document(
         case_id=case_id,
+        client_id=case.client_id if client_exists else None, # Avoids foreign key violation
         file_name=file.filename,
         file_path=file_path,
         file_category=file_category,
@@ -196,33 +216,47 @@ def upload_case_document(
     return doc
 
 
-@router.post("/cases/{case_id}/billing", response_model=schemas.CaseBillingResponse, status_code=status.HTTP_201_CREATED)
-def add_billing_entry(case_id: int, payload: schemas.CaseBillingCreate, db: Session = Depends(get_db_for_tenant)):
+@router.post("/cases/{case_id}/billing", response_model=schemas.BillingEntryResponse, status_code=status.HTTP_201_CREATED)
+def add_billing_entry(
+    case_id: int, 
+    billing_data: schemas.BillingEntryCreate, 
+    db: Session = Depends(get_db_for_tenant)
+):
     check_legal_tenant(db)
     case = db.query(models.LegalCase).filter(models.LegalCase.id == case_id).first()
     if not case:
         raise HTTPException(status_code=404, detail="Case not found")
 
-    dumped = payload.model_dump() if hasattr(payload, "model_dump") else payload.dict()
-    entry = models.CaseBillingEntry(case_id=case_id, **dumped)
+    dumped = billing_data.model_dump(exclude_unset=True)  # dict() if using Pydantic v1
+
+    # Pop client_id and case_id to prevent duplicate keyword arguments
+    dumped.pop("client_id", None)
+    dumped.pop("case_id", None)
+
+    entry = models.BillingEntry(
+        case_id=case_id,
+        client_id=case.client_id,
+        **dumped
+    )
     db.add(entry)
     db.commit()
     db.refresh(entry)
     return entry
+
 
 # --- SUB-RESOURCE DELETE ENDPOINTS ---
 
 @router.delete("/cases/{case_id}/notes/{note_id}", status_code=status.HTTP_204_NO_CONTENT)
 def delete_case_note(case_id: int, note_id: int, db: Session = Depends(get_db_for_tenant)):
     check_legal_tenant(db)
-    note = db.query(models.CaseNote).filter(
-        models.CaseNote.id == note_id, 
-        models.CaseNote.case_id == case_id
+    note = db.query(models.Note).filter(
+        models.Note.id == note_id, 
+        models.Note.case_id == case_id
     ).first()
     if not note:
         raise HTTPException(status_code=404, detail="Note not found")
     
-    db.delete(note)  # Or set note.is_deleted = True if you added that column
+    db.delete(note)
     db.commit()
     return None
 
@@ -230,14 +264,13 @@ def delete_case_note(case_id: int, note_id: int, db: Session = Depends(get_db_fo
 @router.delete("/cases/{case_id}/documents/{doc_id}", status_code=status.HTTP_200_OK)
 def archive_case_document(case_id: int, doc_id: int, db: Session = Depends(get_db_for_tenant)):
     check_legal_tenant(db)
-    doc = db.query(models.CaseDocument).filter(
-        models.CaseDocument.id == doc_id, 
-        models.CaseDocument.case_id == case_id
+    doc = db.query(models.Document).filter(
+        models.Document.id == doc_id, 
+        models.Document.case_id == case_id
     ).first()
     if not doc:
         raise HTTPException(status_code=404, detail="Document not found")
     
-    # Toggle or set is_archived
     doc.is_archived = True
     db.commit()
     return {"message": "Document archived"}
@@ -246,9 +279,9 @@ def archive_case_document(case_id: int, doc_id: int, db: Session = Depends(get_d
 @router.delete("/cases/{case_id}/billing/{billing_id}", status_code=status.HTTP_204_NO_CONTENT)
 def delete_billing_entry(case_id: int, billing_id: int, db: Session = Depends(get_db_for_tenant)):
     check_legal_tenant(db)
-    entry = db.query(models.CaseBillingEntry).filter(
-        models.CaseBillingEntry.id == billing_id, 
-        models.CaseBillingEntry.case_id == case_id
+    entry = db.query(models.BillingEntry).filter(
+        models.BillingEntry.id == billing_id, 
+        models.BillingEntry.case_id == case_id
     ).first()
     if not entry:
         raise HTTPException(status_code=404, detail="Billing entry not found")

@@ -4,14 +4,14 @@ import { useState } from 'react';
 import { CaseNote } from '@/app/types/legal';
 import { createCaseNote, deleteCaseNote } from "@/app/lib/api"
 
-interface CaseNotesTabProps {
+interface NotesTabProps {
   caseId: number;
   tenant: string;
   notes: CaseNote[];
   onNoteAdded: () => void;
 }
 
-export default function CaseNotesTab({ caseId, tenant, notes, onNoteAdded }: CaseNotesTabProps) {
+export default function NotesTab({ caseId, tenant, notes, onNoteAdded }: NotesTabProps) {
   const [content, setContent] = useState('');
   const [authorName, setAuthorName] = useState('');
   const [noteType, setNoteType] = useState('General');

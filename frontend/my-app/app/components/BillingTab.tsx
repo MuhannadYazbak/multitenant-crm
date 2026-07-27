@@ -4,14 +4,14 @@ import { useState } from 'react';
 import { CaseBillingEntry } from '@/app/types/legal';
 import { createCaseBillingEntry, deleteCaseBillingEntry } from '@/app/lib/api';
 
-interface CaseBillingTabProps {
+interface BillingTabProps {
     caseId: number;
     tenant: string;
     entries: CaseBillingEntry[];
     onEntryAdded: () => void;
 }
 
-export default function CaseBillingTab({ caseId, tenant, entries, onEntryAdded }: CaseBillingTabProps) {
+export default function BillingTab({ caseId, tenant, entries, onEntryAdded }: BillingTabProps) {
     const [description, setDescription] = useState('');
     const [hours, setHours] = useState('');
     const [rate, setRate] = useState('200');

@@ -3,9 +3,9 @@
 import { useState, useEffect, useCallback } from 'react';
 import { LegalCase } from '@/app/types/legal';
 import { fetchClientCases, fetchCaseDetails, archiveLegalCase, createLegalCase } from '@/app/lib/api';
-import CaseNotesTab from './legal/CaseNotesTab';
-import CaseDocumentsTab from './legal/CaseDocumentsTab';
-import CaseBillingTab from './legal/CaseBillingTab';
+import NotesTab from './NotesTab'
+import DocumentsTab from './DocumentsTab'
+import BillingTab from './BillingTab'
 
 interface LegalCasesProps {
   tenant: string;
@@ -335,7 +335,7 @@ export default function LegalCases({ tenant, clientId }: LegalCasesProps) {
                   {/* Active Tab Panel */}
                   <div>
                     {activeTab === 'notes' && (
-                      <CaseNotesTab
+                      <NotesTab
                         caseId={activeCase.id}
                         tenant={tenant}
                         notes={activeCase.notes || []}
@@ -343,7 +343,7 @@ export default function LegalCases({ tenant, clientId }: LegalCasesProps) {
                       />
                     )}
                     {activeTab === 'documents' && (
-                      <CaseDocumentsTab
+                      <DocumentsTab
                         caseId={activeCase.id}
                         tenant={tenant}
                         documents={activeCase.documents || []}
@@ -351,7 +351,7 @@ export default function LegalCases({ tenant, clientId }: LegalCasesProps) {
                       />
                     )}
                     {activeTab === 'billing' && (
-                      <CaseBillingTab
+                      <BillingTab
                         caseId={activeCase.id}
                         tenant={tenant}
                         entries={activeCase.billing_entries || []}

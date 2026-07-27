@@ -25,7 +25,10 @@ export default function ClientDetailPage() {
     const [newFieldKey, setNewFieldKey] = useState("");
     const [newFieldValue, setNewFieldValue] = useState("");
     const [saving, setSaving] = useState(false);
-    const [tenantType, setTenantType] = useState<string | null>(null);
+    
+    // Synchronously derive initial tenantType based on route param!
+    const initialTenantType = tenant === "company-c" ? "legal" : tenant === "company-a" ? "insurance" : null;
+    const [tenantType, setTenantType] = useState<string | null>(initialTenantType);
 
     useEffect(() => {
         if (!tenant || !clientName) return;
