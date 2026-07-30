@@ -111,30 +111,55 @@ export class LegalClientPage {
     }
 
 
+    // async uploadDocument(filePath: string, category: string = 'General') {
+    //     // 1. Click Documents tab inside drawer
+    //     await this.docsTabButton.click();
+
+    //     // 2. 💡 CRITICAL: Wait for the file input to actually exist in the DOM inside the active tab!
+    //     const fileInput = this.drawerContainer.locator('input[type="file"]');
+    //     await fileInput.waitFor({ state: 'visible', timeout: 5000 });
+
+    //     // 3. Set files directly on the visible input
+    //     await fileInput.setInputFiles(filePath);
+
+    //     // 4. Handle category select if present
+    //     const categorySelect = this.drawerContainer.locator('select').first();
+    //     if (await categorySelect.isVisible()) {
+    //         await categorySelect.selectOption(category);
+    //     }
+
+    //     // 5. Submit form
+    //     const uploadBtn = this.drawerContainer.getByRole('button', { name: 'Upload', exact: true });
+    //     await expect(uploadBtn).toBeEnabled({ timeout: 5000 });
+    //     await uploadBtn.click();
+
+    //     // 6. Settle network calls
+    //     await this.page.waitForLoadState('networkidle');
+    // }
+
     async uploadDocument(filePath: string, category: string = 'General') {
-        // 1. Click Documents tab inside drawer
         await this.docsTabButton.click();
 
-        // 2. 💡 CRITICAL: Wait for the file input to actually exist in the DOM inside the active tab!
         const fileInput = this.drawerContainer.locator('input[type="file"]');
         await fileInput.waitFor({ state: 'visible', timeout: 5000 });
-
-        // 3. Set files directly on the visible input
         await fileInput.setInputFiles(filePath);
 
-        // 4. Handle category select if present
         const categorySelect = this.drawerContainer.locator('select').first();
         if (await categorySelect.isVisible()) {
             await categorySelect.selectOption(category);
         }
 
-        // 5. Submit form
         const uploadBtn = this.drawerContainer.getByRole('button', { name: 'Upload', exact: true });
         await expect(uploadBtn).toBeEnabled({ timeout: 5000 });
-        await uploadBtn.click();
 
-        // 6. Settle network calls
-        await this.page.waitForLoadState('networkidle');
+        // 💡 Wait explicitly for backend upload response to avoid premature assertions
+        const responsePromise = this.page.waitForResponse(
+            (resp) => resp.url().includes('/documents') && (resp.status() === 200 || resp.status() === 201),
+            { timeout: 10000 }
+        );
+
+        await uploadBtn.click();
+        await responsePromise;
     }
 
     async archiveFirstDocument() {
