@@ -110,29 +110,32 @@ export class LegalClientPage {
         await expect(this.drawerHeader).toContainText(caseNumber);
     }
 
-    // async uploadDocument(filePath: string, category = 'Contract') {
-    //     // 1. Switch to Documents tab
-    //     await this.docsTabButton.click();
 
-    //     // 2. Locate input inside drawer
-    //     const fileInput = this.drawerContainer.locator('input[type="file"]');
-    //     await fileInput.waitFor({ state: 'attached' });
+    async uploadDocument(filePath: string, category: string = 'General') {
+        // 1. Click Documents tab inside drawer
+        await this.docsTabButton.click();
 
-    //     // 3. Attach file
-    //     await fileInput.setInputFiles(filePath);
+        // 2. 💡 CRITICAL: Wait for the file input to actually exist in the DOM inside the active tab!
+        const fileInput = this.drawerContainer.locator('input[type="file"]');
+        await fileInput.waitFor({ state: 'visible', timeout: 5000 });
 
-    //     // 4. Select category if present
-    //     if (category) {
-    //         await this.categorySelect.selectOption(category).catch(() => {});
-    //     }
+        // 3. Set files directly on the visible input
+        await fileInput.setInputFiles(filePath);
 
-    //     // 5. Wait for upload button to be enabled
-    //     await expect(this.uploadDocButton).toBeEnabled({ timeout: 5000 });
+        // 4. Handle category select if present
+        const categorySelect = this.drawerContainer.locator('select').first();
+        if (await categorySelect.isVisible()) {
+            await categorySelect.selectOption(category);
+        }
 
-    //     // 6. Click Upload and settle
-    //     await this.uploadDocButton.click();
-    //     await this.page.waitForLoadState('networkidle');
-    // }
+        // 5. Submit form
+        const uploadBtn = this.drawerContainer.getByRole('button', { name: 'Upload', exact: true });
+        await expect(uploadBtn).toBeEnabled({ timeout: 5000 });
+        await uploadBtn.click();
+
+        // 6. Settle network calls
+        await this.page.waitForLoadState('networkidle');
+    }
 
     async archiveFirstDocument() {
         await this.drawerContainer.locator('tbody tr').first().getByRole('button', { name: /archive/i }).click();
@@ -144,28 +147,4 @@ export class LegalClientPage {
         await this.page.waitForLoadState('networkidle');
     }
 
-    // Inside tests/pages/LegalClientPage.ts:
-
-    async uploadDocument(filePath: string, category: string = 'General') {
-        await this.docsTabButton.click();
-
-        // 1. Locate file input inside drawer
-        const fileInput = this.drawerContainer.locator('input[type="file"]');
-
-        // 2. Set file and fire change event for React state
-        await fileInput.setInputFiles(filePath);
-        await fileInput.evaluate((e: HTMLInputElement) => e.dispatchEvent(new Event('change', { bubbles: true })));
-
-        // 3. Select category if dropdown exists
-        const categorySelect = this.drawerContainer.locator('select');
-        if (await categorySelect.isVisible()) {
-            await categorySelect.selectOption(category);
-        }
-
-        // 4. Click 'Upload'
-        const uploadBtn = this.drawerContainer.getByRole('button', { name: 'Upload', exact: true });
-        await expect(uploadBtn).toBeEnabled({ timeout: 5000 });
-        await uploadBtn.click();
-        await this.page.waitForLoadState('networkidle');
-    }
 }

@@ -29,10 +29,10 @@ test.describe('Legal Module - Case & Soft Delete Lifecycle', () => {
                 'Content-Type': 'application/json'
             },
             data: {
-                name: testClient,           
-                full_name: testClient,      
+                name: testClient,
+                full_name: testClient,
                 email: 'charlie@example.com',
-                phone: '0501234567',   
+                phone: '0501234567',
                 address: 'Haifa, Israel',
                 status: 'active',
                 custom_fields: {}
@@ -54,7 +54,8 @@ test.describe('Legal Module - Case & Soft Delete Lifecycle', () => {
 
         // 4. Upload Doc
         await legalPage.uploadDocument(dummyFilePath, 'Contract');
-        await expect(legalPage.drawerContainer.locator('table')).toContainText('test-doc.txt');
+        const expectedFileName = path.basename(dummyFilePath); // e.g., 'test-doc.txt'
+        await expect(legalPage.drawerContainer.locator('table')).toContainText(expectedFileName)
 
         // 5. Archive Doc
         await legalPage.archiveFirstDocument();
