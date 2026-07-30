@@ -99,9 +99,19 @@ class NoteBase(BaseModel):
 
 class NoteCreate(NoteBase):
     author_name: Optional[str] = "System User"
-    client_id: Optional[int] = None
-    case_id: Optional[int] = None
+    # client_id: Optional[int] = None
+    # case_id: Optional[int] = None
+    # policy_id: Optional[int] = None
+
+# Insurance specific
+class InsuranceNoteCreate(NoteBase):
+    author_name: Optional[str] = "System User"
     policy_id: Optional[int] = None
+
+# Legal specific
+class LegalNoteCreate(NoteBase):
+    author_name: Optional[str] = "System User"
+    case_id: Optional[int] = None
 
 class NoteResponse(NoteBase):
     id: int

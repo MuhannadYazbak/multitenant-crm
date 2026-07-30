@@ -9,8 +9,6 @@ router = APIRouter(
     tags=["Insurance Module"]
 )
 
-# routers/insurance.py
-
 @router.post("/policies", response_model=schemas.InsurancePolicyResponse, status_code=status.HTTP_201_CREATED)
 def create_policy(
     policy_data: schemas.InsurancePolicyCreate, 
@@ -28,17 +26,11 @@ def create_policy(
     if not client:
         raise HTTPException(status_code=404, detail="Client not found")
 
-    dumped = policy_data.model_dump() if hasattr(policy_data, "model_dump") else policy_data.dict()
-    new_policy = models.InsurancePolicy(**dumped)
-    
+    new_policy = models.InsurancePolicy(**policy_data.model_dump())
     db.add(new_policy)
-    db.flush()  # Populates auto-generated ID & defaults in-memory
-    
-    # Safely convert to Pydantic before session commit
-    response_data = schemas.InsurancePolicyResponse.model_validate(new_policy)
     db.commit()
-    
-    return response_data
+    db.refresh(new_policy)
+    return new_policy
 
 
 @router.get("/clients/{client_id}/policies", response_model=List[schemas.InsurancePolicyResponse])

@@ -1,10 +1,9 @@
-// app/[tenant]/clients/[name]/page.tsx (or ClientDetailPage.tsx)
 "use client";
 
 import { useParams, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { Client } from "@/app/types/client";
-import { fetchClientDetails } from "@/app/lib/api";
+import { fetchClientDetails, updateClient } from "@/app/lib/api";
 import Navbar from "@/app/components/Navbar";
 import InsurancePolicies from "@/app/components/InsurancePolicies";
 import LegalCases from "@/app/components/LegalCases";
@@ -28,8 +27,8 @@ export default function ClientDetailPage() {
     const [newFieldValue, setNewFieldValue] = useState("");
     const [saving, setSaving] = useState(false);
 
-    // Derive initial tenantType
-    const initialTenantType = tenant === "company-c" ? "legal" : tenant === "company-a" ? "insurance" : "general";
+    // Synchronously derive initial tenantType based on route param!
+    const initialTenantType = tenant === "company-c" ? "legal" : tenant === "company-a" ? "insurance" : null;
     const [tenantType, setTenantType] = useState<string | null>(initialTenantType);
 
     useEffect(() => {
@@ -38,6 +37,7 @@ export default function ClientDetailPage() {
         setLoading(true);
         setError(null);
 
+        // Fetch Client Details using your existing working API call
         fetchClientDetails(tenant, clientName)
             .then((clientData) => {
                 setClient(clientData);
@@ -50,20 +50,23 @@ export default function ClientDetailPage() {
                     custom_fields: clientData.custom_fields || {},
                 });
 
+                // Fetch workspace tenant info independently so it doesn't block loading the client
                 fetch(`http://localhost:8000/api/tenants/${tenant}`)
                     .then((res) => res.ok ? res.json() : null)
                     .then((tenantData) => {
                         if (tenantData && tenantData.tenant_type) {
                             setTenantType(tenantData.tenant_type);
                         } else {
+                            // Fallback mapping if tenant API is unreached
                             setTenantType(
                                 tenant === "company-a" ? "insurance" :
-                                tenant === "company-c" ? "legal" : "general"
+                                    tenant === "company-c" ? "legal" : "general"
                             );
                         }
                     })
                     .catch(() => {
-                        setTenantType(tenant === "company-c" ? "legal" : tenant === "company-a" ? "insurance" : "general");
+                        // Safety fallback
+                        setTenantType(tenant === "company-c" ? "legal" : "insurance");
                     });
             })
             .catch((err) => {
@@ -95,7 +98,11 @@ export default function ClientDetailPage() {
             }
 
             const updatedClient = await response.json();
+
+            // 1. Update active client state synchronously
             setClient(updatedClient);
+
+            // 2. Close edit mode/modal
             setIsEditing(false);
 
         } catch (err: any) {
@@ -127,12 +134,13 @@ export default function ClientDetailPage() {
         setEditForm({ ...editForm, custom_fields: updated });
     };
 
+
     return (
         <div className="min-h-screen bg-slate-50">
             <Navbar tenantName={tenant} />
 
             <div className="p-6 space-y-6 max-w-6xl mx-auto">
-                {/* TOP BAR */}
+                {/* TOP BAR: Buttons grouped neatly with gap-3 */}
                 <div className="flex items-center gap-3">
                     <button
                         suppressHydrationWarning
@@ -159,11 +167,11 @@ export default function ClientDetailPage() {
                 ) : error ? (
                     <p className="text-red-500">{error}</p>
                 ) : client ? (
-                    /* DYNAMIC GRID LAYOUT */
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-start max-w-5xl">
+                    /* TWO-COLUMN GRID LAYOUT */
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-start max-w-4xl">
 
                         {/* COLUMN 1: Client Details / Edit Form */}
-                        <div className="p-6 bg-white border rounded-xl shadow-sm space-y-4">
+                        <div className="p-6 bg-white border rounded-xl shadow-sm space-y-4 hover:scale-[1.05] hover:transition duration-200">
                             {!isEditing ? (
                                 /* READ ONLY VIEW */
                                 <div className="flex flex-col items-center space-y-3">
@@ -302,25 +310,23 @@ export default function ClientDetailPage() {
                             )}
                         </div>
 
-                        {/* COLUMN 2: Contextual Modules */}
+                        {/* COLUMN 2: Dynamic Vertical Modules */}
                         {client.id !== undefined && (
                             <div className="space-y-6">
-                                {/* Option A: Vertical Modules (Tabs handled inside their Drawers) */}
-                                {tenantType === "insurance" && (
+                                {/* 1. General Client Tabs (Works for ALL tenants) */}
+                                <TabsSection
+                                    tenant={tenant}
+                                    entityType="client"
+                                    entityId={client.id}
+                                />
+
+                                {/* 2. Vertical Specific Modules */}
+                                {(tenantType === "insurance") && (
                                     <InsurancePolicies tenant={tenant} clientId={client.id} />
                                 )}
 
-                                {tenantType === "legal" && (
+                                {(tenantType === "legal") && (
                                     <LegalCases tenant={tenant} clientId={client.id} />
-                                )}
-
-                                {/* Option B: General Tenants (Tabs rendered directly at Client level) */}
-                                {tenantType !== "insurance" && tenantType !== "legal" && (
-                                    <TabsSection
-                                        tenant={tenant}
-                                        entityType="client"
-                                        entityId={client.id}
-                                    />
                                 )}
                             </div>
                         )}
@@ -328,5 +334,5 @@ export default function ClientDetailPage() {
                 ) : null}
             </div>
         </div>
-    );
-}
+    )
+};

@@ -407,63 +407,63 @@ export async function archiveLegalCase(tenant: string, caseId: number): Promise<
 
 // --- UNIVERSAL TABS API HELPERS ---
 
-// 1. NOTES
+/**
+ * Fetch notes for any entity (client, legal_case, or insurance_policy)
+ */
 export async function fetchEntityNotes(tenant: string, entityType: string, entityId: number) {
-  const res = await fetch(`${API_BASE_URL}/api/tabs/${entityType}/${entityId}/notes`, {
+  const params = new URLSearchParams({
+    entity_type: entityType,
+    entity_id: entityId.toString(),
+  });
+
+  const res = await fetch(`${API_BASE_URL}/api/notes?${params.toString()}`, {
     headers: { "X-Tenant": tenant },
   });
+
   if (!res.ok) throw new Error("Failed to fetch notes");
   return res.json();
 }
 
+/**
+ * Create a note for any entity
+ */
 export async function createEntityNote(
   tenant: string,
   entityType: string,
   entityId: number,
   noteData: { author_name: string; note_type: string; content: string; is_pinned?: boolean }
 ) {
-  const res = await fetch(`${API_BASE_URL}/api/tabs/${entityType}/${entityId}/notes`, {
+  const res = await fetch(`${API_BASE_URL}/api/notes`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
       "X-Tenant": tenant,
     },
-    body: JSON.stringify(noteData),
+    body: JSON.stringify({
+      entity_type: entityType,
+      entity_id: entityId,
+      ...noteData,
+    }),
   });
 
   if (!res.ok) {
     const errorData = await res.json().catch(() => null);
     throw new Error(errorData?.detail || "Failed to create note");
   }
+
   return res.json();
 }
 
-export async function deleteEntityNote(
-  tenant: string,
-  entityType: string,
-  entityId: number,
-  noteId: number
-): Promise<void> {
-  const res = await fetch(`${API_BASE_URL}/api/tabs/${entityType}/${entityId}/notes/${noteId}`, {
-    method: "DELETE",
-    headers: { "X-Tenant": tenant },
+/**
+ * Fetch documents for any entity
+ */
+export async function fetchEntityDocuments(tenant: string, entityType: string, entityId: number) {
+  const params = new URLSearchParams({
+    entity_type: entityType,
+    entity_id: entityId.toString(),
   });
 
-  if (!res.ok) {
-    const errorData = await res.json().catch(() => null);
-    throw new Error(errorData?.detail || "Failed to delete note");
-  }
-}
-
-// 2. DOCUMENTS
-export async function fetchEntityDocuments(
-  tenant: string,
-  entityType: string,
-  entityId: number,
-  showArchived: boolean = false
-) {
-  const url = `${API_BASE_URL}/api/tabs/${entityType}/${entityId}/documents${showArchived ? "?show_archived=true" : ""}`;
-  const res = await fetch(url, {
+  const res = await fetch(`${API_BASE_URL}/api/documents?${params.toString()}`, {
     headers: { "X-Tenant": tenant },
   });
 
@@ -471,6 +471,9 @@ export async function fetchEntityDocuments(
   return res.json();
 }
 
+/**
+ * Upload a document for any entity
+ */
 export async function uploadEntityDocument(
   tenant: string,
   entityType: string,
@@ -481,8 +484,10 @@ export async function uploadEntityDocument(
   const formData = new FormData();
   formData.append("file", file);
   formData.append("file_category", fileCategory);
+  formData.append("entity_type", entityType);
+  formData.append("entity_id", entityId.toString());
 
-  const res = await fetch(`${API_BASE_URL}/api/tabs/${entityType}/${entityId}/documents`, {
+  const res = await fetch(`${API_BASE_URL}/api/documents`, {
     method: "POST",
     headers: {
       "X-Tenant": tenant,
@@ -496,71 +501,4 @@ export async function uploadEntityDocument(
   }
 
   return res.json();
-}
-
-export async function archiveEntityDocument(
-  tenant: string,
-  entityType: string,
-  entityId: number,
-  docId: number
-): Promise<void> {
-  const res = await fetch(`${API_BASE_URL}/api/tabs/${entityType}/${entityId}/documents/${docId}/archive`, {
-    method: "PUT",
-    headers: { "X-Tenant": tenant },
-  });
-
-  if (!res.ok) {
-    const errorData = await res.json().catch(() => null);
-    throw new Error(errorData?.detail || "Failed to archive document");
-  }
-}
-
-// 3. BILLING
-export async function fetchEntityBilling(tenant: string, entityType: string, entityId: number) {
-  const res = await fetch(`${API_BASE_URL}/api/tabs/${entityType}/${entityId}/billing`, {
-    headers: { "X-Tenant": tenant },
-  });
-
-  if (!res.ok) throw new Error("Failed to fetch billing entries");
-  return res.json();
-}
-
-export async function createEntityBilling(
-  tenant: string,
-  entityType: string,
-  entityId: number,
-  billingData: { description: string; hours: number; rate: number; total_amount: number; is_paid?: boolean }
-) {
-  const res = await fetch(`${API_BASE_URL}/api/tabs/${entityType}/${entityId}/billing`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "X-Tenant": tenant,
-    },
-    body: JSON.stringify(billingData),
-  });
-
-  if (!res.ok) {
-    const errorData = await res.json().catch(() => null);
-    throw new Error(errorData?.detail || "Failed to create billing entry");
-  }
-
-  return res.json();
-}
-
-export async function deleteEntityBilling(
-  tenant: string,
-  entityType: string,
-  entityId: number,
-  billingId: number
-): Promise<void> {
-  const res = await fetch(`${API_BASE_URL}/api/tabs/${entityType}/${entityId}/billing/${billingId}`, {
-    method: "DELETE",
-    headers: { "X-Tenant": tenant },
-  });
-
-  if (!res.ok) {
-    const errorData = await res.json().catch(() => null);
-    throw new Error(errorData?.detail || "Failed to delete billing entry");
-  }
 }
