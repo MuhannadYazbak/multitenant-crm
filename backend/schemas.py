@@ -241,6 +241,40 @@ class LegalCaseDetailResponse(LegalCaseResponse):
 
     model_config = ConfigDict(from_attributes=True)
 
+# --- VEHICLE SCHEMAS ---
+class VehicleBase(BaseModel):
+    manufacturer: str = Field(..., min_length=1, max_length=100)
+    model: str = Field(..., min_length=1, max_length=100)
+    year: int = Field(..., ge=1970, le=2027)
+    plate_no: str
+
+class VehicleCreate(VehicleBase):
+    pass
+
+class VehicleResponse(VehicleBase):
+    id: str
+    client_id: int
+    created_at: datetime
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+# --- PROPERTY SCHEMAS ---
+class PropertyBase(BaseModel):
+    property_type: str = Field(..., min_length=1, max_length=100, description="e.g. Apartment, House, Warehouse")
+    area: float = Field(..., gt=0, description="Area in sq meters or sq feet")
+    address: Optional[str] = None
+
+class PropertyCreate(PropertyBase):
+    pass
+
+class PropertyResponse(PropertyBase):
+    id: str
+    client_id: int
+    created_at: datetime
+
+    model_config = ConfigDict(from_attributes=True)
+
 
 # ==========================================
 # 7. BACKWARD COMPATIBILITY ALIASES

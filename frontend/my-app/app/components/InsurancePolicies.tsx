@@ -16,6 +16,7 @@ export default function InsurancePolicies({ tenant, clientId }: Props) {
   const [loadingPolicies, setLoadingPolicies] = useState(true);
   const [isInsuranceTenant, setIsInsuranceTenant] = useState(true);
 
+
   // New policy modal state
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [policyNumber, setPolicyNumber] = useState("");
@@ -24,6 +25,8 @@ export default function InsurancePolicies({ tenant, clientId }: Props) {
 
   // Drawer states
   const [selectedPolicy, setSelectedPolicy] = useState<InsurancePolicy | null>(null);
+  const [isVehicleModalOpen, setIsVehicleModalOpen] = useState(false);
+  const [isPropertyModalOpen, setIsPropertyModalOpen] = useState(false);
 
   // Track mounted state to prevent background state updates on unmounted component
   const isMountedRef = useRef(true);
@@ -115,6 +118,8 @@ export default function InsurancePolicies({ tenant, clientId }: Props) {
   const handleCloseDrawer = () => {
     setSelectedPolicy(null);
   };
+
+
 
   // Do not render component if tenant is not configured for insurance
   if (!isInsuranceTenant) return null;
@@ -283,12 +288,11 @@ export default function InsurancePolicies({ tenant, clientId }: Props) {
             </div>
 
             {/* Drawer Content */}
-            <div className="flex-1 overflow-y-auto p-6">
+            <div className="flex-1 overflow-y-auto p-6 space-y-2">
               <TabsSection
                 tenant={tenant}
                 entityType="insurance_policy"
-                entityId={selectedPolicy.id}
-              />
+                entityId={selectedPolicy.id} />
             </div>
           </div>
         </div>

@@ -3,6 +3,9 @@ import type { InsurancePolicy } from "@/app/types/insurancePolicy";
 import type { DashboardStats } from "@/app/types/dashBoard";
 import type { LegalCase, CaseNote, CaseDocument, CaseBillingEntry } from "@/app/types/legal";
 import type { CreateTenantPayload } from "@/app/types/tenant";
+import { VehicleData, VehicleResponse } from "@/app/types/vehicle";
+import  { PropertyData, PropertyResponse} from "@/app/types/property";
+
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8000";
 export const fetchDashboardData = async (tenantName: string) => {
   const response = await fetch("http://127.0.0.1:8000/api/dashboard/clients", {
@@ -249,7 +252,7 @@ export async function createTenant(payload: CreateTenantPayload, adminSecret: st
 }
 
 export async function createLegalCase(
-  tenant: string, 
+  tenant: string,
   caseData: { client_id: number; case_number: string; case_type: string; court?: string; status?: string }
 ) {
   const res = await fetch(`${API_BASE_URL}/api/legal/cases`, {
@@ -392,26 +395,38 @@ export async function deleteCaseBillingEntry(tenant: string, caseId: number, ent
 }
 
 export async function archiveLegalCase(tenant: string, caseId: number): Promise<void> {
-    const res = await fetch(`${API_BASE_URL}/api/legal/cases/${caseId}`, {
-        method: "DELETE",
-        headers: {
-            "X-Tenant": tenant,
-        },
-    });
+  const res = await fetch(`${API_BASE_URL}/api/legal/cases/${caseId}`, {
+    method: "DELETE",
+    headers: {
+      "X-Tenant": tenant,
+    },
+  });
 
-    if (!res.ok) {
-        const errorData = await res.json().catch(() => null);
-        throw new Error(errorData?.detail || "Failed to archive case");
-    }
+  if (!res.ok) {
+    const errorData = await res.json().catch(() => null);
+    throw new Error(errorData?.detail || "Failed to archive case");
+  }
 }
 
 // --- UNIVERSAL TABS API HELPERS ---
 
 // 1. NOTES
+// export async function fetchEntityNotes(tenant: string, entityType: string, entityId: number) {
+//   const res = await fetch(`${API_BASE_URL}/api/tabs/${entityType}/${entityId}/notes`, {
+//     headers: { "X-Tenant": tenant },
+//   });
+//   if (!res.ok) throw new Error("Failed to fetch notes");
+//   return res.json();
+// }
+
 export async function fetchEntityNotes(tenant: string, entityType: string, entityId: number) {
-  const res = await fetch(`${API_BASE_URL}/api/tabs/${entityType}/${entityId}/notes`, {
+  const url = `${API_BASE_URL}/api/tabs/${entityType}/${entityId}/notes`;
+  console.log("Fetching notes from URL:", url, "with tenant:", tenant);
+  
+  const res = await fetch(url, {
     headers: { "X-Tenant": tenant },
   });
+
   if (!res.ok) throw new Error("Failed to fetch notes");
   return res.json();
 }
@@ -562,5 +577,186 @@ export async function deleteEntityBilling(
   if (!res.ok) {
     const errorData = await res.json().catch(() => null);
     throw new Error(errorData?.detail || "Failed to delete billing entry");
+  }
+}
+
+// --- VEHICLES ---
+
+export async function fetchClientVehicles(
+  tenant: string,
+  clientId: number
+): Promise<VehicleResponse[]> {
+  const res = await fetch(`${API_BASE_URL}/api/insurance/clients/${clientId}/vehicles`, {
+    headers: { "X-Tenant": tenant },
+  });
+
+  if (!res.ok) {
+    const errorData = await res.json().catch(() => null);
+    throw new Error(errorData?.detail || "Failed to fetch vehicles");
+  }
+
+  return res.json();
+}
+
+export async function createClientVehicle(
+  tenant: string,
+  clientId: number,
+  vehicleData: VehicleData
+): Promise<VehicleResponse> {
+  const res = await fetch(`${API_BASE_URL}/api/insurance/clients/${clientId}/vehicles`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "X-Tenant": tenant,
+    },
+    body: JSON.stringify(vehicleData),
+  });
+
+  if (!res.ok) {
+    const errorData = await res.json().catch(() => null);
+    throw new Error(errorData?.detail || "Failed to create vehicle");
+  }
+
+  return res.json();
+}
+
+export async function updateVehicle(
+  tenant: string,
+  vehicleId: string,
+  vehicleData: VehicleData
+): Promise<VehicleResponse> {
+  const res = await fetch(`${API_BASE_URL}/api/insurance/vehicles/${vehicleId}`, {
+    method: "PUT",
+    headers: {
+      "Content-Type": "application/json",
+      "X-Tenant": tenant,
+    },
+    body: JSON.stringify(vehicleData),
+  });
+
+  if (!res.ok) {
+    const errorData = await res.json().catch(() => null);
+    throw new Error(errorData?.detail || "Failed to update vehicle");
+  }
+
+  return res.json();
+}
+
+export async function deleteVehicle(
+  tenant: string,
+  vehicleId: string
+): Promise<void> {
+  const res = await fetch(`${API_BASE_URL}/api/insurance/vehicles/${vehicleId}`, {
+    method: "DELETE",
+    headers: { "X-Tenant": tenant },
+  });
+
+  if (!res.ok) {
+    const errorData = await res.json().catch(() => null);
+    throw new Error(errorData?.detail || "Failed to delete vehicle");
+  }
+}
+
+// --- PROPERTIES ---
+
+export async function fetchClientProperties(
+  tenant: string,
+  clientId: number
+): Promise<PropertyResponse[]> {
+  const res = await fetch(`${API_BASE_URL}/api/insurance/clients/${clientId}/properties`, {
+    headers: { "X-Tenant": tenant },
+  });
+
+  if (!res.ok) {
+    const errorData = await res.json().catch(() => null);
+    throw new Error(errorData?.detail || "Failed to fetch properties");
+  }
+
+  return res.json();
+}
+
+export async function createClientProperty(
+  tenant: string,
+  clientId: number,
+  propertyData: PropertyData
+): Promise<PropertyResponse> {
+  const res = await fetch(`${API_BASE_URL}/api/insurance/clients/${clientId}/properties`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "X-Tenant": tenant,
+    },
+    body: JSON.stringify(propertyData),
+  });
+
+  if (!res.ok) {
+    const errorData = await res.json().catch(() => null);
+    // Format Pydantic detail array into a readable string if it's an object/array
+    const message = typeof errorData?.detail === "object"
+      ? JSON.stringify(errorData.detail)
+      : errorData?.detail || "Failed to create property";
+      
+    throw new Error(message);
+  }
+
+  return res.json();
+}
+
+// export async function createClientProperty(
+//   tenant: string,
+//   clientId: number,
+//   propertyData: PropertyData
+// ): Promise<PropertyResponse> {
+//   const res = await fetch(`${API_BASE_URL}/api/insurance/clients/${clientId}/properties`, {
+//     method: "POST",
+//     headers: {
+//       "Content-Type": "application/json",
+//       "X-Tenant": tenant,
+//     },
+//     body: JSON.stringify(propertyData),
+//   });
+
+//   if (!res.ok) {
+//     const errorData = await res.json().catch(() => null);
+//     throw new Error(errorData?.detail || "Failed to create property");
+//   }
+
+//   return res.json();
+// }
+
+export async function updateProperty(
+  tenant: string,
+  propertyId: string,
+  propertyData: PropertyData
+): Promise<PropertyResponse> {
+  const res = await fetch(`${API_BASE_URL}/api/insurance/properties/${propertyId}`, {
+    method: "PUT",
+    headers: {
+      "Content-Type": "application/json",
+      "X-Tenant": tenant,
+    },
+    body: JSON.stringify(propertyData),
+  });
+
+  if (!res.ok) {
+    const errorData = await res.json().catch(() => null);
+    throw new Error(errorData?.detail || "Failed to update property");
+  }
+
+  return res.json();
+}
+
+export async function deleteProperty(
+  tenant: string,
+  propertyId: string
+): Promise<void> {
+  const res = await fetch(`${API_BASE_URL}/api/insurance/properties/${propertyId}`, {
+    method: "DELETE",
+    headers: { "X-Tenant": tenant },
+  });
+
+  if (!res.ok) {
+    const errorData = await res.json().catch(() => null);
+    throw new Error(errorData?.detail || "Failed to delete property");
   }
 }
