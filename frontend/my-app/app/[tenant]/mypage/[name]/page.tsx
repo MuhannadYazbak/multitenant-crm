@@ -3,14 +3,20 @@
 import { useParams, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { Client } from "@/app/types/client";
-import { 
-  fetchClientDetails, 
-  createClientVehicle, 
-  createClientProperty,
-  fetchClientVehicles,
-  fetchClientProperties,
-  deleteVehicle,
-  deleteProperty
+import {
+    fetchClientDetails,
+    createClientVehicle,
+    createClientProperty,
+    fetchClientVehicles,
+    fetchClientProperties,
+    deleteVehicle,
+    deleteProperty,
+    createClientEvidence,
+    fetchClientEvidences,
+    deleteEvidence,
+    fetchClientWitnesses,
+    createClientWitness,
+    deleteWitness
 } from "@/app/lib/api";
 import Navbar from "@/app/components/Navbar";
 import InsurancePolicies from "@/app/components/InsurancePolicies";
@@ -18,8 +24,12 @@ import LegalCases from "@/app/components/LegalCases";
 import TabsSection from "@/app/components/TabsSections";
 import { VehicleData, VehicleResponse } from "@/app/types/vehicle";
 import { PropertyData, PropertyResponse } from "@/app/types/property";
+import { EvidenceData, EvidenceResponse } from "@/app/types/evidence";
+import { WitnessData, WitnessResponse } from "@/app/types/witness";
 import VehicleModal from "@/app/components/VehicleWindow";
 import PropertyModal from "@/app/components/PropertyWindow";
+import EvidenceModal from "@/app/components/EvidenceWindow";
+import WitnessModal from "@/app/components/WitnessWindow";
 
 export default function ClientDetailPage() {
     const params = useParams();
@@ -33,11 +43,13 @@ export default function ClientDetailPage() {
     const [error, setError] = useState<string | null>(null);
 
     // Dynamic Tab State
-    const [activeTab, setActiveTab] = useState<string>("policies");
+    const [activeTab, setActiveTab] = useState<string>("cases");
 
-    // Insurance Assets State
+    // Insurance & Legal Assets State
     const [vehicles, setVehicles] = useState<VehicleResponse[]>([]);
     const [properties, setProperties] = useState<PropertyResponse[]>([]);
+    const [evidences, setEvidences] = useState<EvidenceResponse[]>([]);
+    const [witnesses, setWitnesses] = useState<WitnessResponse[]>([]);
 
     // Edit state
     const [isEditing, setIsEditing] = useState(false);
@@ -45,10 +57,12 @@ export default function ClientDetailPage() {
     const [newFieldKey, setNewFieldKey] = useState("");
     const [newFieldValue, setNewFieldValue] = useState("");
     const [saving, setSaving] = useState(false);
-    
+
     // Modal controls
     const [isVehicleModalOpen, setIsVehicleModalOpen] = useState(false);
     const [isPropertyModalOpen, setIsPropertyModalOpen] = useState(false);
+    const [isEvidenceModalOpen, setIsEvidenceModalOpen] = useState(false);
+    const [isWitnessModalOpen, setIsWitnessModalOpen] = useState(false);
 
     // Tenant vertical type
     const initialTenantType = tenant === "company-c" ? "legal" : tenant === "company-a" ? "insurance" : "general";
@@ -85,7 +99,11 @@ export default function ClientDetailPage() {
                 }
                 setTenantType(currentTenantType);
 
-                // Fetch Insurance specific assets if applicable
+                // Set default active tab according to vertical
+                if (currentTenantType === "insurance") setActiveTab("policies");
+                if (currentTenantType === "legal") setActiveTab("cases");
+
+                // Fetch Insurance assets if applicable
                 if (currentTenantType === "insurance" && clientData.id) {
                     try {
                         const [fetchedVehicles, fetchedProperties] = await Promise.all([
@@ -96,6 +114,20 @@ export default function ClientDetailPage() {
                         setProperties(fetchedProperties);
                     } catch (assetErr) {
                         console.error("Error loading insurance sub-resources:", assetErr);
+                    }
+                }
+
+                // Fetch Legal assets if applicable
+                if (currentTenantType === "legal" && clientData.id) {
+                    try {
+                        const [fetchedEvidences, fetchedWitnesses] = await Promise.all([
+                            fetchClientEvidences(tenant, clientData.id),
+                            fetchClientWitnesses(tenant, clientData.id)
+                        ]);
+                        setEvidences(fetchedEvidences);
+                        setWitnesses(fetchedWitnesses);
+                    } catch (assetErr) {
+                        console.error("Error loading legal sub-resources:", assetErr);
                     }
                 }
             })
@@ -202,6 +234,52 @@ export default function ClientDetailPage() {
             setProperties((prev) => prev.filter((p) => p.id !== propertyId));
         } catch (error: any) {
             alert(error.message || "Failed to delete property");
+        }
+    };
+
+    // WITNESS HANDLERS
+    const handleAddWitness = async (newWitness: WitnessData) => {
+        if (!client?.id) return;
+        try {
+            const createdWitness = await createClientWitness(tenant, client.id, newWitness);
+            setWitnesses((prev) => [...prev, createdWitness]);
+            setIsWitnessModalOpen(false);
+        } catch (error: any) {
+            console.error("Failed to add witness:", error);
+            alert(error.message || "Failed to add witness");
+        }
+    };
+
+    const handleDeleteWitness = async (witnessId: string) => {
+        if (!confirm("Are you sure you want to delete this witness?")) return;
+        try {
+            await deleteWitness(tenant, witnessId);
+            setWitnesses((prev) => prev.filter((w) => w.id !== witnessId));
+        } catch (error: any) {
+            alert(error.message || "Failed to delete witness");
+        }
+    };
+
+    // EVIDENCE HANDLERS
+    const handleAddEvidence = async (newEvidence: EvidenceData) => {
+        if (!client?.id) return;
+        try {
+            const createdEvidence = await createClientEvidence(tenant, client.id, newEvidence);
+            setEvidences((prev) => [...prev, createdEvidence]);
+            setIsEvidenceModalOpen(false);
+        } catch (error: any) {
+            console.error("Failed to add evidence:", error);
+            alert(error.message || "Failed to add evidence");
+        }
+    };
+
+    const handleDeleteEvidence = async (evidenceId: string) => {
+        if (!confirm("Are you sure you want to delete this evidence?")) return;
+        try {
+            await deleteEvidence(tenant, evidenceId);
+            setEvidences((prev) => prev.filter((ev) => ev.id !== evidenceId));
+        } catch (error: any) {
+            alert(error.message || "Failed to delete evidence");
         }
     };
 
@@ -383,38 +461,35 @@ export default function ClientDetailPage() {
                         {/* COLUMN 2: TABBED MODULES */}
                         {client.id !== undefined && (
                             <div className="lg:col-span-2 bg-white border rounded-xl shadow-sm p-6 space-y-4">
-                                
+
                                 {/* TAB NAVIGATION HEADER */}
                                 <div className="flex border-b gap-2 text-sm font-medium">
                                     {tenantType === "insurance" && (
                                         <>
                                             <button
                                                 onClick={() => setActiveTab("policies")}
-                                                className={`pb-2 px-3 border-b-2 transition ${
-                                                    activeTab === "policies"
+                                                className={`pb-2 px-3 border-b-2 transition ${activeTab === "policies"
                                                         ? "border-blue-600 text-blue-600 font-semibold"
                                                         : "border-transparent text-gray-500 hover:text-gray-700"
-                                                }`}
+                                                    }`}
                                             >
                                                 📋 Policies
                                             </button>
                                             <button
                                                 onClick={() => setActiveTab("vehicles")}
-                                                className={`pb-2 px-3 border-b-2 transition ${
-                                                    activeTab === "vehicles"
+                                                className={`pb-2 px-3 border-b-2 transition ${activeTab === "vehicles"
                                                         ? "border-blue-600 text-blue-600 font-semibold"
                                                         : "border-transparent text-gray-500 hover:text-gray-700"
-                                                }`}
+                                                    }`}
                                             >
                                                 🚗 Vehicles ({vehicles.length})
                                             </button>
                                             <button
                                                 onClick={() => setActiveTab("properties")}
-                                                className={`pb-2 px-3 border-b-2 transition ${
-                                                    activeTab === "properties"
+                                                className={`pb-2 px-3 border-b-2 transition ${activeTab === "properties"
                                                         ? "border-blue-600 text-blue-600 font-semibold"
                                                         : "border-transparent text-gray-500 hover:text-gray-700"
-                                                }`}
+                                                    }`}
                                             >
                                                 🏠 Properties ({properties.length})
                                             </button>
@@ -422,25 +497,43 @@ export default function ClientDetailPage() {
                                     )}
 
                                     {tenantType === "legal" && (
-                                        <button
-                                            onClick={() => setActiveTab("cases")}
-                                            className={`pb-2 px-3 border-b-2 transition ${
-                                                activeTab === "cases"
-                                                    ? "border-blue-600 text-blue-600 font-semibold"
-                                                    : "border-transparent text-gray-500 hover:text-gray-700"
-                                            }`}
-                                        >
-                                            ⚖️ Legal Cases
-                                        </button>
+                                        <>
+                                            <button
+                                                onClick={() => setActiveTab("cases")}
+                                                className={`pb-2 px-3 border-b-2 transition ${activeTab === "cases"
+                                                        ? "border-blue-600 text-blue-600 font-semibold"
+                                                        : "border-transparent text-gray-500 hover:text-gray-700"
+                                                    }`}
+                                            >
+                                                ⚖️ Legal Cases
+                                            </button>
+                                            <button
+                                                onClick={() => setActiveTab("evidence")}
+                                                className={`pb-2 px-3 border-b-2 transition ${activeTab === "evidence"
+                                                        ? "border-blue-600 text-blue-600 font-semibold"
+                                                        : "border-transparent text-gray-500 hover:text-gray-700"
+                                                    }`}
+                                            >
+                                                📁 Evidence ({evidences.length})
+                                            </button>
+                                            <button
+                                                onClick={() => setActiveTab("witnesses")}
+                                                className={`pb-2 px-3 border-b-2 transition ${activeTab === "witnesses"
+                                                        ? "border-blue-600 text-blue-600 font-semibold"
+                                                        : "border-transparent text-gray-500 hover:text-gray-700"
+                                                    }`}
+                                            >
+                                                👥 Witnesses ({witnesses.length})
+                                            </button>
+                                        </>
                                     )}
 
                                     <button
                                         onClick={() => setActiveTab("activity")}
-                                        className={`pb-2 px-3 border-b-2 transition ${
-                                            activeTab === "activity"
+                                        className={`pb-2 px-3 border-b-2 transition ${activeTab === "activity"
                                                 ? "border-blue-600 text-blue-600 font-semibold"
                                                 : "border-transparent text-gray-500 hover:text-gray-700"
-                                        }`}
+                                            }`}
                                     >
                                         📁 Notes & Billing
                                     </button>
@@ -448,7 +541,7 @@ export default function ClientDetailPage() {
 
                                 {/* TAB CONTENTS */}
                                 <div className="pt-2">
-                                    {/* 1. POLICIES TAB */}
+                                    {/* 1. INSURANCE POLICIES TAB */}
                                     {tenantType === "insurance" && activeTab === "policies" && (
                                         <InsurancePolicies tenant={tenant} clientId={client.id} />
                                     )}
@@ -511,7 +604,7 @@ export default function ClientDetailPage() {
                                                     {properties.map((p) => (
                                                         <div key={p.id} className="p-3 flex justify-between items-center bg-white hover:bg-slate-50">
                                                             <div>
-                                                                <p className="font-medium text-gray-900">{p.type} - {p.area} sq m</p>
+                                                                <p className="font-medium text-gray-900">{p.property_type} - {p.area} sq m</p>
                                                                 {p.address && (
                                                                     <p className="text-xs text-gray-500">{p.address}</p>
                                                                 )}
@@ -534,7 +627,80 @@ export default function ClientDetailPage() {
                                         <LegalCases tenant={tenant} clientId={client.id} />
                                     )}
 
-                                    {/* 5. NOTES & BILLING TAB */}
+                                    {/* 5. EVIDENCE TAB */}
+                                    {tenantType === "legal" && activeTab === "evidence" && (
+                                        <div className="space-y-4">
+                                            <div className="flex justify-between items-center">
+                                                <h3 className="font-semibold text-gray-800">Client Evidence</h3>
+                                                <button
+                                                    onClick={() => setIsEvidenceModalOpen(true)}
+                                                    className="bg-blue-600 hover:bg-blue-700 text-white text-xs px-3 py-1.5 rounded font-medium transition"
+                                                >
+                                                    + Add Evidence
+                                                </button>
+                                            </div>
+
+                                            {evidences.length === 0 ? (
+                                                <p className="text-sm text-gray-500 py-4">No evidence recorded for this client.</p>
+                                            ) : (
+                                                <div className="divide-y border rounded-lg overflow-hidden text-sm">
+                                                    {evidences.map((ev) => (
+                                                        <div key={ev.id} className="p-3 flex justify-between items-center bg-white hover:bg-slate-50">
+                                                            <div>
+                                                                <p className="font-medium text-gray-900">{ev.evidence_type}: {ev.evidence_detail}</p>
+                                                            </div>
+                                                            <button
+                                                                onClick={() => handleDeleteEvidence(ev.id)}
+                                                                className="text-red-500 hover:text-red-700 text-xs font-semibold"
+                                                            >
+                                                                Delete
+                                                            </button>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            )}
+                                        </div>
+                                    )}
+
+                                    {/* 6. WITNESSES TAB */}
+                                    {tenantType === "legal" && activeTab === "witnesses" && (
+                                        <div className="space-y-4">
+                                            <div className="flex justify-between items-center">
+                                                <h3 className="font-semibold text-gray-800">Client Witnesses</h3>
+                                                <button
+                                                    onClick={() => setIsWitnessModalOpen(true)}
+                                                    className="bg-blue-600 hover:bg-blue-700 text-white text-xs px-3 py-1.5 rounded font-medium transition"
+                                                >
+                                                    + Add Witness
+                                                </button>
+                                            </div>
+
+                                            {witnesses.length === 0 ? (
+                                                <p className="text-sm text-gray-500 py-4">No witnesses recorded for this client.</p>
+                                            ) : (
+                                                <div className="divide-y border rounded-lg overflow-hidden text-sm">
+                                                    {witnesses.map((w) => (
+                                                        <div key={w.id} className="p-3 flex justify-between items-center bg-white hover:bg-slate-50">
+                                                            <div>
+                                                                <p className="font-medium text-gray-900">{w.name}</p>
+                                                                {w.age && (
+                                                                    <p className="text-xs text-gray-500">Contact: {w.phone} {w.email}</p>
+                                                                )}
+                                                            </div>
+                                                            <button
+                                                                onClick={() => handleDeleteWitness(w.id)}
+                                                                className="text-red-500 hover:text-red-700 text-xs font-semibold"
+                                                            >
+                                                                Delete
+                                                            </button>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            )}
+                                        </div>
+                                    )}
+
+                                    {/* 7. NOTES & BILLING TAB */}
                                     {(activeTab === "activity" || (tenantType === "general")) && (
                                         <TabsSection
                                             tenant={tenant}
@@ -560,6 +726,18 @@ export default function ClientDetailPage() {
                 isOpen={isPropertyModalOpen}
                 onClose={() => setIsPropertyModalOpen(false)}
                 onAdd={handleAddProperty}
+            />
+
+            <EvidenceModal
+                isOpen={isEvidenceModalOpen}
+                onClose={() => setIsEvidenceModalOpen(false)}
+                onAdd={handleAddEvidence}
+            />
+
+            <WitnessModal
+                isOpen={isWitnessModalOpen}
+                onClose={() => setIsWitnessModalOpen(false)}
+                onAdd={handleAddWitness}
             />
         </div>
     );

@@ -275,6 +275,40 @@ class PropertyResponse(PropertyBase):
 
     model_config = ConfigDict(from_attributes=True)
 
+# --- Evidencee SCHEMAS ---
+class EvidenceBase(BaseModel):
+    evidence_type: str = Field(..., min_length=3, max_length=100)
+    evidence_detail: str = Field(..., min_length=5, max_length=100)
+
+class EvidenceCreate(EvidenceBase):
+    pass
+
+class EvidenceResponse(EvidenceBase):
+    id: str
+    client_id: int
+    created_at: datetime
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+# --- WITNESS SCHEMAS ---
+class WitnessBase(BaseModel):
+    name: str = Field(..., min_length=3, max_length=100, description="Full Name")
+    age: float = Field(..., gt=0)
+    phone: str = Field(...,min_length=9, max_length=10)
+    email: str = Field(...,min_length=5, max_length=100)
+    address: Optional[str] = None
+
+class WitnessCreate(WitnessBase):
+    pass
+
+class WitnessResponse(WitnessBase):
+    id: str
+    client_id: int
+    created_at: datetime
+
+    model_config = ConfigDict(from_attributes=True)
+
 
 # ==========================================
 # 7. BACKWARD COMPATIBILITY ALIASES

@@ -289,3 +289,176 @@ def delete_billing_entry(case_id: int, billing_id: int, db: Session = Depends(ge
     db.delete(entry)
     db.commit()
     return None
+
+# -------------------------------------------------------------------
+# EVIDENCE ENDPOINTS
+# -------------------------------------------------------------------
+
+@router.get("/clients/{client_id}/evidneces", response_model=List[schemas.EvidenceResponse])
+def get_client_evidences(
+    client_id: int,
+    db: Session = Depends(get_db_for_tenant)
+):
+    if db.info.get("tenant_type") != "legal":
+        raise HTTPException(status_code=403, detail="Legal module is not enabled for this workspace type")
+
+    return db.query(models.Evidence).filter(models.Evidence.client_id == client_id).all()
+
+
+@router.post("/clients/{client_id}/evidences", response_model=schemas.EvidenceResponse, status_code=status.HTTP_201_CREATED)
+def create_evidence(
+    client_id: int,
+    evidence_data: schemas.EvidenceCreate, 
+    db: Session = Depends(get_db_for_tenant)
+):
+    if db.info.get("tenant_type") != "legal":
+        raise HTTPException(status_code=403, detail="Legal module is not enabled for this workspace type")
+
+    # 1. Verify client exists within this tenant
+    client = db.query(models.Client).filter(models.Client.id == client_id).first()
+    if not client:
+        raise HTTPException(status_code=404, detail="Client not found")
+
+    # 2. Instantiate evidence with client_id from path
+    dumped = evidence_data.model_dump() if hasattr(evidence_data, "model_dump") else evidence_data.dict()
+    new_evidence = models.Evidence(client_id=client_id, **dumped)
+    
+    db.add(new_evidence)
+    db.flush()
+    
+    response_data = schemas.EvidenceResponse.model_validate(new_evidence)
+    db.commit()
+    return response_data
+
+
+@router.put("/evidences/{evidence_id}", response_model=schemas.EvidenceResponse)
+def update_evidence(
+    evidence_id: str,
+    evidence_update: schemas.EvidenceCreate,
+    db: Session = Depends(get_db_for_tenant)
+):
+    if db.info.get("tenant_type") != "legal":
+        raise HTTPException(status_code=403, detail="Legal module is not enabled for this workspace type")
+
+    evidence = db.query(models.Evidence).filter(models.evidence.id == evidence_id).first()
+    if not evidence:
+        raise HTTPException(status_code=404, detail="Evidence not found")
+
+    update_data = evidence_update.model_dump(exclude_unset=True) if hasattr(evidence_update, "model_dump") else evidence_update.dict(exclude_unset=True)
+    for key, value in update_data.items():
+        setattr(evidence, key, value)
+
+    db.flush()
+    response_data = schemas.EvidenceResponse.model_validate(evidence)
+    db.commit()
+    return response_data
+
+
+@router.delete("/evidences/{evidence_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_evidence(
+    evidence_id: str, 
+    db: Session = Depends(get_db_for_tenant)
+):
+    if db.info.get("tenant_type") != "legal":
+        raise HTTPException(status_code=403, detail="Module restricted to legal tenants")
+
+    evidence = db.query(models.Evidence).filter(models.Evidence.id == evidence_id).first()
+    if not evidence:
+        raise HTTPException(status_code=404, detail="Evidence not found")
+
+    db.delete(evidence)
+    db.commit()
+    return None
+
+
+# -------------------------------------------------------------------
+# WITNESS ENDPOINTS
+# -------------------------------------------------------------------
+
+@router.get("/clients/{client_id}/witnesses", response_model=List[schemas.WitnessResponse])
+def get_client_witnesses(
+    client_id: int,
+    db: Session = Depends(get_db_for_tenant)
+):
+    if db.info.get("tenant_type") != "legal":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN, 
+            detail="Legal module is not enabled for this workspace type"
+        )
+
+    return db.query(models.Witness).filter(models.Witness.client_id == client_id).all()
+
+
+@router.post("/clients/{client_id}/witnesses", response_model=schemas.WitnessResponse, status_code=status.HTTP_201_CREATED)
+def create_witness(
+    client_id: int,
+    witness_data: schemas.WitnessCreate, 
+    db: Session = Depends(get_db_for_tenant)
+):
+    if db.info.get("tenant_type") != "legal":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN, 
+            detail="Legal module is not enabled for this workspace type"
+        )
+
+    # 1. Verify client exists within this tenant
+    client = db.query(models.Client).filter(models.Client.id == client_id).first()
+    if not client:
+        raise HTTPException(status_code=404, detail="Client not found")
+
+    # 2. Instantiate Witness with client_id passed in URL path
+    dumped = witness_data.model_dump() if hasattr(witness_data, "model_dump") else witness_data.dict()
+    new_witness = models.Witness(client_id=client_id, **dumped)
+    
+    db.add(new_witness)
+    db.flush()  # Generates UUID & defaults in-memory
+    
+    response_data = schemas.WitnessResponse.model_validate(new_witness)
+    db.commit()
+    return response_data
+
+
+@router.put("/witnesses/{witness_id}", response_model=schemas.WitnessResponse)
+def update_witness(
+    witness_id: str,
+    witness_update: schemas.WitnessCreate,
+    db: Session = Depends(get_db_for_tenant)
+):
+    if db.info.get("tenant_type") != "legal":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN, 
+            detail="Legal module is not enabled for this workspace type"
+        )
+
+    witness = db.query(models.Witness).filter(models.Witness.id == witness_id).first()
+    if not witness:
+        raise HTTPException(status_code=404, detail="Witness not found")
+
+    update_data = witness_update.model_dump(exclude_unset=True) if hasattr(witness_update, "model_dump") else witness_update.dict(exclude_unset=True)
+    for key, value in update_data.items():
+        setattr(witness, key, value)
+
+    db.flush()
+    response_data = schemas.witnessResponse.model_validate(witness)
+    db.commit()
+    return response_data
+
+
+@router.delete("/witnesses/{witness_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_witness(
+    witness_id: str, 
+    db: Session = Depends(get_db_for_tenant)
+):
+    if db.info.get("tenant_type") != "legal":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN, 
+            detail="Module restricted to legal tenants"
+        )
+
+    witness = db.query(models.Witness).filter(models.Witness.id == witness_id).first()
+    if not witness:
+        raise HTTPException(status_code=404, detail="Witness not found")
+
+    db.delete(witness)
+    db.commit()
+    return None

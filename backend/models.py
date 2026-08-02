@@ -54,6 +54,8 @@ class Client(Base):
     legal_cases = relationship("LegalCase", back_populates="client", cascade="all, delete-orphan")
     vehicles = relationship("Vehicle", back_populates="client", cascade="all, delete-orphan")
     properties = relationship("Property", back_populates="client", cascade="all, delete-orphan")
+    evidences = relationship("Evidence", back_populates="client", cascade="all, delete-orphan")
+    witnesses = relationship("Witness", back_populates="client", cascade="all, delete-orphan")
 
 
 # --- FLEXIBLE SUB-RESOURCE MODULES ---
@@ -188,3 +190,33 @@ class LegalCase(Base):
     notes = relationship("Note", back_populates="case", cascade="all, delete-orphan")
     documents = relationship("Document", back_populates="case", cascade="all, delete-orphan")
     billing_entries = relationship("BillingEntry", back_populates="case", cascade="all, delete-orphan")
+    
+class Evidence(Base):
+    __tablename__ = "evidences"
+
+    id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    client_id = Column(Integer, ForeignKey("clients.id", ondelete="CASCADE"), nullable=False)
+    
+    evidence_type = Column(String(100), nullable=False)
+    evidence_detail = Column(String(100), nullable=False)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+    # Relationship back to Client
+    client = relationship("Client", back_populates="evidences")
+
+
+class Witness(Base):
+    __tablename__ = "witnesses"
+
+    id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    client_id = Column(Integer, ForeignKey("clients.id", ondelete="CASCADE"), nullable=False)
+    
+    name = Column(String(100), nullable=False)  # e.g. "Residential", "Commercial", "Apartment"
+    age = Column(Float, nullable=False)    
+    phone = Column(String(10), nullable=False)
+    email = Column(String(30), nullable=False)       
+    address = Column(String(255), nullable=True)        # Optional address field if needed
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+    # Relationship back to Client
+    client = relationship("Client", back_populates="witnesses")

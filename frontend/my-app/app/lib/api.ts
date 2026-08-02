@@ -5,6 +5,8 @@ import type { LegalCase, CaseNote, CaseDocument, CaseBillingEntry } from "@/app/
 import type { CreateTenantPayload } from "@/app/types/tenant";
 import { VehicleData, VehicleResponse } from "@/app/types/vehicle";
 import  { PropertyData, PropertyResponse} from "@/app/types/property";
+import { EvidenceData, EvidenceResponse } from "../types/evidence";
+import { WitnessData, WitnessResponse } from "../types/witness";
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8000";
 export const fetchDashboardData = async (tenantName: string) => {
@@ -702,28 +704,6 @@ export async function createClientProperty(
   return res.json();
 }
 
-// export async function createClientProperty(
-//   tenant: string,
-//   clientId: number,
-//   propertyData: PropertyData
-// ): Promise<PropertyResponse> {
-//   const res = await fetch(`${API_BASE_URL}/api/insurance/clients/${clientId}/properties`, {
-//     method: "POST",
-//     headers: {
-//       "Content-Type": "application/json",
-//       "X-Tenant": tenant,
-//     },
-//     body: JSON.stringify(propertyData),
-//   });
-
-//   if (!res.ok) {
-//     const errorData = await res.json().catch(() => null);
-//     throw new Error(errorData?.detail || "Failed to create property");
-//   }
-
-//   return res.json();
-// }
-
 export async function updateProperty(
   tenant: string,
   propertyId: string,
@@ -758,5 +738,171 @@ export async function deleteProperty(
   if (!res.ok) {
     const errorData = await res.json().catch(() => null);
     throw new Error(errorData?.detail || "Failed to delete property");
+  }
+}
+
+// --- Evidence ---
+export async function fetchClientEvidences(
+  tenant: string,
+  clientId: number
+): Promise<EvidenceResponse[]> {
+  const url = `${API_BASE_URL}/api/legal/clients/${clientId}/evidences`
+  console.log("Fetching evidences from:", url);
+  const res = await fetch(`${API_BASE_URL}/api/insurance/clients/${clientId}/evidences`, {
+    headers: { "X-Tenant": tenant },
+  });
+
+  if (!res.ok) {
+    const errorData = await res.json().catch(() => null);
+    throw new Error(errorData?.detail || "Failed to fetch evidences");
+  }
+
+  return res.json();
+}
+
+export async function createClientEvidence(
+  tenant: string,
+  clientId: number,
+  evidenceData: EvidenceData
+): Promise<EvidenceResponse> {
+  const res = await fetch(`${API_BASE_URL}/api/legal/clients/${clientId}/evidences`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "X-Tenant": tenant,
+    },
+    body: JSON.stringify(evidenceData),
+  });
+
+  if (!res.ok) {
+    const errorData = await res.json().catch(() => null);
+    // Format Pydantic detail array into a readable string if it's an object/array
+    const message = typeof errorData?.detail === "object"
+      ? JSON.stringify(errorData.detail)
+      : errorData?.detail || "Failed to create evidence";
+      
+    throw new Error(message);
+  }
+
+  return res.json();
+}
+
+
+export async function updateEvidence(
+  tenant: string,
+  evidenceId: string,
+  evidenceData: EvidenceData
+): Promise<EvidenceResponse> {
+  const res = await fetch(`${API_BASE_URL}/api/legal/evidences/${evidenceId}`, {
+    method: "PUT",
+    headers: {
+      "Content-Type": "application/json",
+      "X-Tenant": tenant,
+    },
+    body: JSON.stringify(evidenceData),
+  });
+
+  if (!res.ok) {
+    const errorData = await res.json().catch(() => null);
+    throw new Error(errorData?.detail || "Failed to update evidence");
+  }
+
+  return res.json();
+}
+
+export async function deleteEvidence(
+  tenant: string,
+  evidenceId: string
+): Promise<void> {
+  const res = await fetch(`${API_BASE_URL}/api/legal/evidences/${evidenceId}`, {
+    method: "DELETE",
+    headers: { "X-Tenant": tenant },
+  });
+
+  if (!res.ok) {
+    const errorData = await res.json().catch(() => null);
+    throw new Error(errorData?.detail || "Failed to delete evidence");
+  }
+}
+
+// --- Witness ---
+export async function fetchClientWitnesses(
+  tenant: string,
+  clientId: number
+): Promise<WitnessResponse[]> {
+  const res = await fetch(`${API_BASE_URL}/api/legal/clients/${clientId}/witnesses`, {
+    headers: { "X-Tenant": tenant },
+  });
+
+  if (!res.ok) {
+    const errorData = await res.json().catch(() => null);
+    throw new Error(errorData?.detail || "Failed to fetch witnesses");
+  }
+
+  return res.json();
+}
+
+export async function createClientWitness(
+  tenant: string,
+  clientId: number,
+  witnessData: WitnessData
+): Promise<WitnessResponse> {
+  const res = await fetch(`${API_BASE_URL}/api/legal/clients/${clientId}/witnesses`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "X-Tenant": tenant,
+    },
+    body: JSON.stringify(witnessData),
+  });
+
+  if (!res.ok) {
+    const errorData = await res.json().catch(() => null);
+    // Format Pydantic detail array into a readable string if it's an object/array
+    const message = typeof errorData?.detail === "object"
+      ? JSON.stringify(errorData.detail)
+      : errorData?.detail || "Failed to create witness";
+      
+    throw new Error(message);
+  }
+
+  return res.json();
+}
+
+
+export async function updateWitness(
+  tenant: string,
+  witnessId: string,
+  witnessData: WitnessData
+): Promise<WitnessResponse> {
+  const res = await fetch(`${API_BASE_URL}/api/legal/witnesses/${witnessId}`, {
+    method: "PUT",
+    headers: {
+      "Content-Type": "application/json",
+      "X-Tenant": tenant,
+    },
+    body: JSON.stringify(witnessData),
+  });
+
+  if (!res.ok) {
+    const errorData = await res.json().catch(() => null);
+    throw new Error(errorData?.detail || "Failed to update witness");
+  }
+
+  return res.json();
+}
+
+export async function deleteWitness(
+  tenant: string,
+  witnessId: string
+): Promise<void> {
+  const res = await fetch(`${API_BASE_URL}/api/legal/witnesses/${witnessId}`, {
+    method: "DELETE",
+    headers: { "X-Tenant": tenant },
+  });
+
+  if (!res.ok) {
+    const errorData = await res.json().catch(() => null);
+    throw new Error(errorData?.detail || "Failed to delete witness");
   }
 }
