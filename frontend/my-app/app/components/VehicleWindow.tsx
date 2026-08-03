@@ -1,15 +1,15 @@
 'use client'
 import React, { useState } from "react"
-import { Vehicle } from "@/app/types/vehicle"
+import { VehicleData} from "@/app/types/vehicle"
 
 interface VehicleModalProps {
   isOpen: boolean
   onClose: () => void
-  onAdd: (vehicle: Vehicle) => void
+  onAdd: (vehicle: VehicleData) => void
 }
 
 export default function VehicleModal({ isOpen, onClose, onAdd }: VehicleModalProps) {
-  const [vehicle, setVehicle] = useState<Vehicle>({
+  const [vehicle, setVehicle] = useState<VehicleData>({
     manufacturer: "",
     model: "",
     year: new Date().getFullYear(),
@@ -19,7 +19,7 @@ export default function VehicleModal({ isOpen, onClose, onAdd }: VehicleModalPro
 
   if (!isOpen) return null
 
-  const handleChange = (field: keyof Vehicle, value: string | number) => {
+  const handleChange = (field: keyof VehicleData, value: string | number) => {
     setVehicle((prev) => ({
       ...prev,
       [field]: value

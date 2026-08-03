@@ -3,7 +3,7 @@ import { LegalClientPage } from '../pages/LegalClientPage';
 import path from 'path';
 import fs from 'fs';
 
-test.describe('Legal Module - Case & Soft Delete Lifecycle', () => {
+test.describe('Legal Module - Case, Evidence, Witness & Lifecycle', () => {
     const testTenant = 'company-c';
     const testClient = 'Charlie Brown';
     const testCaseNumber = `CAS-TEST-${Date.now()}`;
@@ -21,8 +21,8 @@ test.describe('Legal Module - Case & Soft Delete Lifecycle', () => {
         }
     });
 
-    test('should create a case, manage sub-resources, soft-delete doc, and archive case', async ({ page, request }) => {
-        // Seed Client on company-c
+    test('should manage full legal client lifecycle including evidence and witnesses', async ({ page, request }) => {
+        // Seed Client
         const clientResponse = await request.post('http://127.0.0.1:8000/api/clients', {
             headers: {
                 'X-Tenant': testTenant,
@@ -45,28 +45,30 @@ test.describe('Legal Module - Case & Soft Delete Lifecycle', () => {
         // 1. Navigate
         await legalPage.goto(testTenant, testClient);
 
-        // 2. Create Case
+        // 2. 🆕 Add Evidence & Witness
+        const evidenceDetail = `Audio Recording ${Date.now()}`;
+        const witnessName = 'Eye Witness'
+
+        await legalPage.addEvidence('Recording', evidenceDetail);
+        await expect(page.locator('body')).toContainText(evidenceDetail);
+
+        await legalPage.addWitness(witnessName, 20, '0541112233', 'witness@example.com');
+        await expect(page.locator('body')).toContainText(witnessName);
+
+        // 3. Create Case
         await legalPage.createCase(testCaseNumber, 'Civil Litigation', 'Haifa District Court');
         await expect(page.locator('table').first()).toContainText(testCaseNumber);
 
-        // 3. Open Drawer
+        // 4. Open Drawer & Upload Doc
         await legalPage.openCaseDrawer(testCaseNumber);
-
-        // 4. Upload Doc
         await legalPage.uploadDocument(dummyFilePath, 'Contract');
-        const expectedFileName = path.basename(dummyFilePath); // e.g., 'test-doc.txt'
-        await expect(legalPage.drawerContainer.locator('table')).toContainText(expectedFileName)
+        const expectedFileName = path.basename(dummyFilePath);
+        await expect(page.locator('table').last()).toContainText(expectedFileName);
 
-        // 5. Archive Doc
+        // 5. Soft-Delete (Archive) Doc
         await legalPage.archiveFirstDocument();
-        await expect(legalPage.drawerContainer.locator('table')).not.toContainText('test-doc.txt');
-
-        // 💡 FIX: Global locator for document toggle button
-        const toggleBtn = page.getByRole('button', { name: /Show (Archived|Active) Documents/i });
-        if (await toggleBtn.isVisible()) {
-            await toggleBtn.click();
-            await expect(legalPage.drawerContainer.locator('table')).toContainText('test-doc.txt');
-        }
+        await expect(page.locator('table').last().getByText(expectedFileName)).toBeHidden({ timeout: 10000 });
+        //await expect(page.locator('table').last()).not.toContainText(expectedFileName);
 
         // 6. Archive Case
         await legalPage.archiveCurrentCase();

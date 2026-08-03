@@ -22,7 +22,7 @@ export class GeneralClientPage {
         });
 
         // Tabs
-        this.notesTabButton = page.getByRole('button', { name: /Notes/i });
+        this.notesTabButton = page.getByRole('button', { name: '📝 Notes' });
         this.docsTabButton = page.getByRole('button', { name: /Documents/i });
         this.billingTabButton = page.getByRole('button', { name: /Billing/i });
 

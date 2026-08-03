@@ -552,6 +552,7 @@ export default function ClientDetailPage() {
                                             <div className="flex justify-between items-center">
                                                 <h3 className="font-semibold text-gray-800">Client Vehicles</h3>
                                                 <button
+                                                    id='addVehicleBtn'
                                                     onClick={() => setIsVehicleModalOpen(true)}
                                                     className="bg-blue-600 hover:bg-blue-700 text-white text-xs px-3 py-1.5 rounded font-medium transition"
                                                 >
@@ -590,6 +591,7 @@ export default function ClientDetailPage() {
                                             <div className="flex justify-between items-center">
                                                 <h3 className="font-semibold text-gray-800">Client Properties</h3>
                                                 <button
+                                                    id='addPropertyBtn'
                                                     onClick={() => setIsPropertyModalOpen(true)}
                                                     className="bg-blue-600 hover:bg-blue-700 text-white text-xs px-3 py-1.5 rounded font-medium transition"
                                                 >
@@ -633,6 +635,7 @@ export default function ClientDetailPage() {
                                             <div className="flex justify-between items-center">
                                                 <h3 className="font-semibold text-gray-800">Client Evidence</h3>
                                                 <button
+                                                    id="addEvidenceBtn"
                                                     onClick={() => setIsEvidenceModalOpen(true)}
                                                     className="bg-blue-600 hover:bg-blue-700 text-white text-xs px-3 py-1.5 rounded font-medium transition"
                                                 >
@@ -668,6 +671,7 @@ export default function ClientDetailPage() {
                                             <div className="flex justify-between items-center">
                                                 <h3 className="font-semibold text-gray-800">Client Witnesses</h3>
                                                 <button
+                                                    id="addWitnessBtn"
                                                     onClick={() => setIsWitnessModalOpen(true)}
                                                     className="bg-blue-600 hover:bg-blue-700 text-white text-xs px-3 py-1.5 rounded font-medium transition"
                                                 >
