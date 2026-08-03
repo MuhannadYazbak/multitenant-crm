@@ -82,10 +82,21 @@ export class LegalClientPage {
         this.addWitnessButton = page.locator('#addWitnessBtn');
     }
 
+    // LegalClientPage.ts & InsuranceClientPage.ts
     async goto(tenant: string, clientName: string) {
+        // 1. Navigate to client page
         await this.page.goto(`/${tenant}/mypage/${encodeURIComponent(clientName)}`);
-        // Wait directly for the main profile layout to be mounted
-        await this.page.locator('h1, h2', { hasText: 'Client Profile' }).waitFor({ state: 'visible', timeout: 10000 });
+
+        // 2. Wait for profile header containing client's name to render
+        await this.page.locator('h1, h2', { hasText: clientName }).waitFor({ state: 'visible', timeout: 10000 });
+
+        // 3. Ensure loading overlay/spinner is gone before interacting
+        await this.page.waitForFunction(
+            () => !document.body.innerText.includes('Loading'),
+            { timeout: 10000 }
+        );
+
+        await this.page.waitForLoadState('networkidle');
     }
 
     async clickCasesTab() {

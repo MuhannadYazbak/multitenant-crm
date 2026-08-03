@@ -33,11 +33,10 @@ test.describe('Insurance Module - Policy, Vehicle, Property Lifecycle', () => {
         });
 
         expect([200, 201]).toContain(clientResponse.status());
-        const createdClient = await clientResponse.json();
 
         const insurancePage = new InsuranceClientPage(page);
 
-        // 1. Navigate to the client page
+        // Pass testClient string so /mypage/Alice%20Smith... loads properly
         await insurancePage.goto(testTenant, testClient);
 
         // 2. Add Vehicle & Property Verticals

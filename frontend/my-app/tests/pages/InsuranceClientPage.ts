@@ -60,7 +60,7 @@ export class InsuranceClientPage {
         this.drawerDeletePolicyButton = this.drawerContainer.getByRole('button', { name: /delete/i });
 
         // Drawer Tabs & Notes Form Controls
-        this.policiesTabButton = this.page.getByRole('button', { name: /policies/i});
+        this.policiesTabButton = this.page.getByRole('button', { name: /policies/i });
         this.notesTabButton = this.drawerContainer.getByRole('button', { name: /Notes/i });
         this.drawerAuthorInput = this.drawerContainer.getByPlaceholder('Author Name');
         this.drawerNoteInput = this.drawerContainer.getByPlaceholder('Type note details...');
@@ -81,12 +81,20 @@ export class InsuranceClientPage {
         this.submitPropertyButton = page.getByRole('button', { name: /add property|save property/i });
     }
 
+    // LegalClientPage.ts & InsuranceClientPage.ts
     async goto(tenant: string, clientName: string) {
+        // 1. Navigate to client page
         await this.page.goto(`/${tenant}/mypage/${encodeURIComponent(clientName)}`);
+
+        // 2. Wait for profile header containing client's name to render
+        await this.page.locator('h1, h2', { hasText: clientName }).waitFor({ state: 'visible', timeout: 10000 });
+
+        // 3. Ensure loading overlay/spinner is gone before interacting
         await this.page.waitForFunction(
-            () => !document.body.innerText.includes('Loading profile details...'),
+            () => !document.body.innerText.includes('Loading'),
             { timeout: 10000 }
         );
+
         await this.page.waitForLoadState('networkidle');
     }
 

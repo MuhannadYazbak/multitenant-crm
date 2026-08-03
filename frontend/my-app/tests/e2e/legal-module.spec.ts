@@ -49,7 +49,7 @@ test.describe('Legal Module - Case, Evidence, Witness & Lifecycle', () => {
 
         const legalPage = new LegalClientPage(page);
 
-        // 1. Navigate
+        // 1. Pass testClient string
         await legalPage.goto(testTenant, testClient);
 
         // 2. Add Evidence & Witness
