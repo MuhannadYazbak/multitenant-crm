@@ -3,10 +3,19 @@ import { InsuranceClientPage } from '../pages/InsuranceClientPage';
 
 test.describe('Insurance Module - Policy, Vehicle, Property Lifecycle', () => {
     const testTenant = 'company-a';
-    const testClient = 'Alice Smith';
-    const testPolicyNumber = `POL-TEST-${Date.now()}`;
+    // Unique name per run to prevent 409 collisions
+    const uniqueId = Date.now();
+    const testClient = `Alice Smith ${uniqueId}`;
+    const testPolicyNumber = `POL-TEST-${uniqueId}`;
 
     test('should create policy, vehicles, properties, and execute drawer actions', async ({ page, request }) => {
+        // Seed Client and verify creation succeeded (200 or 201)
+        const uniqueSuffix = Math.random().toString(36).substring(2, 8); // pure letters/digits, but let's stick to letters for name
+        const randomLetters = Array.from({ length: 6 }, () => String.fromCharCode(97 + Math.floor(Math.random() * 26))).join('');
+
+        const testClient = `Alice Smith ${randomLetters}`; // Matches regex ^[A-Za-z\s'-]+$
+        const testPolicyNumber = `POL-TEST-${Date.now()}`;
+
         // Seed Client
         const clientResponse = await request.post('http://127.0.0.1:8000/api/clients', {
             headers: {
@@ -14,27 +23,27 @@ test.describe('Insurance Module - Policy, Vehicle, Property Lifecycle', () => {
                 'Content-Type': 'application/json'
             },
             data: {
-                name: testClient,
-                full_name: testClient,
-                email: 'alice@example.com',
+                name: testClient, // Cleaned up name passing regex
+                email: `alice_${Date.now()}@example.com`,
                 phone: '0509876543',
-                address: 'Nazareth, Israel',
+                address: 'Nazareth Israel',
                 status: 'active',
                 custom_fields: {}
             }
         });
-        expect([200, 201, 400, 409]).toContain(clientResponse.status());
+
+        expect([200, 201]).toContain(clientResponse.status());
+        const createdClient = await clientResponse.json();
 
         const insurancePage = new InsuranceClientPage(page);
 
-        // 1. Navigate
+        // 1. Navigate to the client page
         await insurancePage.goto(testTenant, testClient);
 
-        // 2. 🆕 Add Vehicle & Property Verticals
-        const testPlate = `12-345-${Math.floor(100 + Math.random() * 900)}`;
-        const testPropertyAddress = `Herzl St ${Date.now()}, Tel Aviv`;
+        // 2. Add Vehicle & Property Verticals
+        const testPropertyAddress = `Herzl St ${uniqueId}, Tel Aviv`;
 
-        await insurancePage.addVehicle('Skoda',     'Rapid', 2017, '1122233');
+        await insurancePage.addVehicle('Skoda', 'Rapid', 2017, '1122233');
         await expect(page.locator('body')).toContainText('1122233');
 
         await insurancePage.addProperty(testPropertyAddress, '2500000');
@@ -46,7 +55,7 @@ test.describe('Insurance Module - Policy, Vehicle, Property Lifecycle', () => {
 
         // 4. Open Policy Drawer & Add Note
         await insurancePage.openPolicyDrawer(testPolicyNumber);
-        const noteContent = `Policy audit note ${Date.now()}`;
+        const noteContent = `Policy audit note ${uniqueId}`;
         await insurancePage.addDrawerNote(noteContent);
         await expect(insurancePage.drawerContainer).toContainText(noteContent);
 

@@ -135,19 +135,30 @@ export class LegalClientPage {
         await fileInput.waitFor({ state: 'attached', timeout: 10000 });
         await fileInput.setInputFiles(filePath);
 
-        // 3. Category selection
+        // 3. Category selection (Match label or value dynamically)
         const categorySelect = this.page.locator('select').filter({ hasText: /general|contract|legal/i }).first();
         if (await categorySelect.isVisible()) {
-            await categorySelect.selectOption(category).catch(() => { });
+            // Try selecting by label, lowercase value, or index
+            try {
+                await categorySelect.selectOption({ label: category });
+            } catch {
+                await categorySelect.selectOption(category.toLowerCase()).catch(() => {
+                    // Fallback to second option if specific string fails
+                    categorySelect.selectOption({ index: 1 });
+                });
+            }
         }
 
-        // 4. Register API wait before clicking upload
+        // 4. Wait for the upload button to actually be enabled
+        const uploadBtn = this.page.getByRole('button', { name: /^Upload$/i });
+        await expect(uploadBtn).toBeEnabled({ timeout: 5000 });
+
+        // 5. Register API wait and click
         const responsePromise = this.page.waitForResponse(
             (resp) => resp.url().includes('/documents') && (resp.status() === 200 || resp.status() === 201),
             { timeout: 10000 }
         );
 
-        const uploadBtn = this.page.getByRole('button', { name: /^Upload$/i });
         await uploadBtn.click();
 
         await responsePromise;
