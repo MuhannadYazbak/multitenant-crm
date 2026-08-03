@@ -39,6 +39,7 @@ def reset_and_seed():
             """))
 
             # Vertical: Insurance
+            # Vertical: Insurance
             if tenant_type == "insurance":
                 conn.execute(text("""
                     CREATE TABLE IF NOT EXISTS insurance_policies (
@@ -53,6 +54,28 @@ def reset_and_seed():
                         end_date TIMESTAMP,
                         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                     );
+
+                    CREATE TABLE IF NOT EXISTS vehicles (
+                        id SERIAL PRIMARY KEY,
+                        policy_id INT REFERENCES insurance_policies(id) ON DELETE CASCADE,
+                        client_id INT REFERENCES clients(id) ON DELETE CASCADE,
+                        make VARCHAR(100) NOT NULL,
+                        model VARCHAR(100) NOT NULL,
+                        year INT NOT NULL,
+                        vin VARCHAR(100),
+                        license_plate VARCHAR(50),
+                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                    );
+
+                    CREATE TABLE IF NOT EXISTS properties (
+                        id SERIAL PRIMARY KEY,
+                        policy_id INT REFERENCES insurance_policies(id) ON DELETE CASCADE,
+                        client_id INT REFERENCES clients(id) ON DELETE CASCADE,
+                        property_type VARCHAR(100) DEFAULT 'Residential',
+                        address VARCHAR(250) NOT NULL,
+                        estimated_value NUMERIC(12, 2),
+                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                    );
                 """))
 
             # Vertical: Legal
@@ -65,6 +88,26 @@ def reset_and_seed():
                         case_type VARCHAR(100) NOT NULL,
                         court VARCHAR(255),
                         status VARCHAR(50) DEFAULT 'Open',
+                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                    );
+
+                    CREATE TABLE IF NOT EXISTS evidences (
+                        id SERIAL PRIMARY KEY,
+                        case_id INT NOT NULL REFERENCES legal_cases(id) ON DELETE CASCADE,
+                        title VARCHAR(255) NOT NULL,
+                        description TEXT,
+                        evidence_type VARCHAR(100),
+                        storage_location VARCHAR(255),
+                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                    );
+
+                    CREATE TABLE IF NOT EXISTS witnesses (
+                        id SERIAL PRIMARY KEY,
+                        case_id INT NOT NULL REFERENCES legal_cases(id) ON DELETE CASCADE,
+                        full_name VARCHAR(150) NOT NULL,
+                        phone VARCHAR(50),
+                        email VARCHAR(100),
+                        statement TEXT,
                         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                     );
                 """))
@@ -164,6 +207,8 @@ def reset_and_seed():
             SELECT setval(pg_get_serial_sequence('clients', 'id'), (SELECT MAX(id) FROM clients));
             SELECT setval(pg_get_serial_sequence('insurance_policies', 'id'), (SELECT MAX(id) FROM insurance_policies));
             SELECT setval(pg_get_serial_sequence('notes', 'id'), (SELECT MAX(id) FROM notes));
+            SELECT setval(pg_get_serial_sequence('vehicles', 'id'), COALESCE((SELECT MAX(id) FROM vehicles), 1));
+            SELECT setval(pg_get_serial_sequence('properties', 'id'), COALESCE((SELECT MAX(id) FROM properties), 1));
         """))
         conn.commit()
 
@@ -210,6 +255,8 @@ def reset_and_seed():
             SELECT setval(pg_get_serial_sequence('notes', 'id'), (SELECT MAX(id) FROM notes));
             SELECT setval(pg_get_serial_sequence('documents', 'id'), (SELECT MAX(id) FROM documents));
             SELECT setval(pg_get_serial_sequence('billing_entries', 'id'), (SELECT MAX(id) FROM billing_entries));
+            SELECT setval(pg_get_serial_sequence('evidences', 'id'), COALESCE((SELECT MAX(id) FROM evidences), 1));
+            SELECT setval(pg_get_serial_sequence('witnesses', 'id'), COALESCE((SELECT MAX(id) FROM witnesses), 1));
         """))
         conn.commit()
 
