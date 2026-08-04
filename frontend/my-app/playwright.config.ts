@@ -4,7 +4,7 @@ import { defineConfig, devices } from "@playwright/test";
 export default defineConfig({
   testDir: "./tests",
   fullyParallel: false,
-  workers: 2,
+  workers: process.env.CI ? 1 : undefined,
   use: {
     baseURL: "http://localhost:3000",
   },

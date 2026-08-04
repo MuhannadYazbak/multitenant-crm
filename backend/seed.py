@@ -3,14 +3,16 @@ import models
 from sqlalchemy import text
 from auth_utils import hash_password
 
+
 def reset_and_seed():
     print("Dropping existing tenant schemas and resetting database...")
     with engine.connect() as conn:
         conn.execute(text("DROP SCHEMA IF EXISTS tenant_company_a CASCADE;"))
         conn.execute(text("DROP SCHEMA IF EXISTS tenant_company_b CASCADE;"))
         conn.execute(text("DROP SCHEMA IF EXISTS tenant_company_c CASCADE;"))
-        conn.execute(text("DROP TABLE IF EXISTS public.tenant_accounts CASCADE;"))
-        
+        conn.execute(
+            text("DROP TABLE IF EXISTS public.tenant_accounts CASCADE;"))
+
         conn.execute(text("CREATE SCHEMA IF NOT EXISTS tenant_company_a;"))
         conn.execute(text("CREATE SCHEMA IF NOT EXISTS tenant_company_b;"))
         conn.execute(text("CREATE SCHEMA IF NOT EXISTS tenant_company_c;"))
@@ -23,7 +25,7 @@ def reset_and_seed():
     def provision_tenant_schema(schema_name: str, tenant_type: str):
         with engine.connect() as conn:
             conn.execute(text(f"SET search_path TO {schema_name};"))
-            
+
             # ALL tenants get core clients table
             conn.execute(text("""
                 CREATE TABLE IF NOT EXISTS clients (
@@ -38,7 +40,7 @@ def reset_and_seed():
                 );
             """))
 
-            # Vertical: Insurance
+            # Insurance Vertical
             if tenant_type == "insurance":
                 conn.execute(text("""
                     CREATE TABLE IF NOT EXISTS insurance_policies (
@@ -53,9 +55,28 @@ def reset_and_seed():
                         end_date TIMESTAMP,
                         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                     );
+
+                    CREATE TABLE IF NOT EXISTS vehicles (
+                        id VARCHAR PRIMARY KEY,
+                        client_id INT NOT NULL REFERENCES clients(id) ON DELETE CASCADE,
+                        manufacturer VARCHAR(100) NOT NULL,
+                        model VARCHAR(100) NOT NULL,
+                        year INT NOT NULL,
+                        plate_no VARCHAR(8) NOT NULL,
+                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                    );
+
+                    CREATE TABLE IF NOT EXISTS properties (
+                        id VARCHAR PRIMARY KEY,
+                        client_id INT NOT NULL REFERENCES clients(id) ON DELETE CASCADE,
+                        property_type VARCHAR(100) NOT NULL,
+                        area FLOAT NOT NULL,
+                        address VARCHAR(255),
+                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                    );
                 """))
 
-            # Vertical: Legal
+            # Legal Vertical
             if tenant_type == "legal":
                 conn.execute(text("""
                     CREATE TABLE IF NOT EXISTS legal_cases (
@@ -65,6 +86,25 @@ def reset_and_seed():
                         case_type VARCHAR(100) NOT NULL,
                         court VARCHAR(255),
                         status VARCHAR(50) DEFAULT 'Open',
+                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                    );
+
+                    CREATE TABLE IF NOT EXISTS evidences (
+                        id VARCHAR PRIMARY KEY,
+                        client_id INT NOT NULL REFERENCES clients(id) ON DELETE CASCADE,
+                        evidence_type VARCHAR(100) NOT NULL,
+                        evidence_detail VARCHAR(100) NOT NULL,
+                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                    );
+
+                    CREATE TABLE IF NOT EXISTS witnesses (
+                        id VARCHAR PRIMARY KEY,
+                        client_id INT NOT NULL REFERENCES clients(id) ON DELETE CASCADE,
+                        name VARCHAR(100) NOT NULL,
+                        age FLOAT NOT NULL,
+                        phone VARCHAR(10) NOT NULL,
+                        email VARCHAR(30) NOT NULL,
+                        address VARCHAR(255),
                         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                     );
                 """))
@@ -140,13 +180,16 @@ def reset_and_seed():
         db.add(admin)
 
     tenants = [
-        models.TenantAccount(company_name="company-a", password_hash=TENANT_HASH, tenant_type="insurance"),
-        models.TenantAccount(company_name="company-b", password_hash=TENANT_HASH, tenant_type="general"),
-        models.TenantAccount(company_name="company-c", password_hash=TENANT_HASH, tenant_type="legal"),
+        models.TenantAccount(company_name="company-a",
+                             password_hash=TENANT_HASH, tenant_type="insurance"),
+        models.TenantAccount(company_name="company-b",
+                             password_hash=TENANT_HASH, tenant_type="general"),
+        models.TenantAccount(company_name="company-c",
+                             password_hash=TENANT_HASH, tenant_type="legal"),
     ]
     db.add_all(tenants)
     db.commit()
-    
+
     # 3. Seed Mock Data Tailored to Each Schema
     print("Seeding Company A (Insurance)...")
     with engine.connect() as conn:
