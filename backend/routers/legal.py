@@ -331,16 +331,38 @@ def create_evidence(
     return response_data
 
 
+# @router.put("/evidences/{evidence_id}", response_model=schemas.EvidenceResponse)
+# def update_evidence(
+#     evidence_id: str,
+#     evidence_update: schemas.EvidenceCreate,
+#     db: Session = Depends(get_db_for_tenant)
+# ):
+#     if db.info.get("tenant_type") != "legal":
+#         raise HTTPException(status_code=403, detail="Legal module is not enabled for this workspace type")
+
+#     evidence = db.query(models.Evidence).filter(models.evidence.id == evidence_id).first()
+#     if not evidence:
+#         raise HTTPException(status_code=404, detail="Evidence not found")
+
+#     update_data = evidence_update.model_dump(exclude_unset=True) if hasattr(evidence_update, "model_dump") else evidence_update.dict(exclude_unset=True)
+#     for key, value in update_data.items():
+#         setattr(evidence, key, value)
+
+#     db.flush()
+#     response_data = schemas.EvidenceResponse.model_validate(evidence)
+#     db.commit()
+#     return response_data
+
 @router.put("/evidences/{evidence_id}", response_model=schemas.EvidenceResponse)
 def update_evidence(
     evidence_id: str,
     evidence_update: schemas.EvidenceCreate,
     db: Session = Depends(get_db_for_tenant)
 ):
-    if db.info.get("tenant_type") != "legal":
-        raise HTTPException(status_code=403, detail="Legal module is not enabled for this workspace type")
+    check_legal_tenant(db)
 
-    evidence = db.query(models.Evidence).filter(models.evidence.id == evidence_id).first()
+    # FIXED: models.Evidence (Capital E)
+    evidence = db.query(models.Evidence).filter(models.Evidence.id == evidence_id).first()
     if not evidence:
         raise HTTPException(status_code=404, detail="Evidence not found")
 
@@ -348,10 +370,9 @@ def update_evidence(
     for key, value in update_data.items():
         setattr(evidence, key, value)
 
-    db.flush()
-    response_data = schemas.EvidenceResponse.model_validate(evidence)
     db.commit()
-    return response_data
+    db.refresh(evidence)
+    return evidence
 
 
 @router.delete("/evidences/{evidence_id}", status_code=status.HTTP_204_NO_CONTENT)
@@ -418,17 +439,38 @@ def create_witness(
     return response_data
 
 
+# @router.put("/witnesses/{witness_id}", response_model=schemas.WitnessResponse)
+# def update_witness(
+#     witness_id: str,
+#     witness_update: schemas.WitnessCreate,
+#     db: Session = Depends(get_db_for_tenant)
+# ):
+#     if db.info.get("tenant_type") != "legal":
+#         raise HTTPException(
+#             status_code=status.HTTP_403_FORBIDDEN, 
+#             detail="Legal module is not enabled for this workspace type"
+#         )
+
+#     witness = db.query(models.Witness).filter(models.Witness.id == witness_id).first()
+#     if not witness:
+#         raise HTTPException(status_code=404, detail="Witness not found")
+
+#     update_data = witness_update.model_dump(exclude_unset=True) if hasattr(witness_update, "model_dump") else witness_update.dict(exclude_unset=True)
+#     for key, value in update_data.items():
+#         setattr(witness, key, value)
+
+#     db.flush()
+#     response_data = schemas.witnessResponse.model_validate(witness)
+#     db.commit()
+#     return response_data
+
 @router.put("/witnesses/{witness_id}", response_model=schemas.WitnessResponse)
 def update_witness(
     witness_id: str,
     witness_update: schemas.WitnessCreate,
     db: Session = Depends(get_db_for_tenant)
 ):
-    if db.info.get("tenant_type") != "legal":
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN, 
-            detail="Legal module is not enabled for this workspace type"
-        )
+    check_legal_tenant(db)
 
     witness = db.query(models.Witness).filter(models.Witness.id == witness_id).first()
     if not witness:
@@ -438,10 +480,9 @@ def update_witness(
     for key, value in update_data.items():
         setattr(witness, key, value)
 
-    db.flush()
-    response_data = schemas.witnessResponse.model_validate(witness)
     db.commit()
-    return response_data
+    db.refresh(witness) # FIXED: directly return ORM model (avoids schemas.witnessResponse lowercase typo)
+    return witness
 
 
 @router.delete("/witnesses/{witness_id}", status_code=status.HTTP_204_NO_CONTENT)

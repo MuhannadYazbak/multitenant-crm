@@ -3,14 +3,16 @@ import models
 from sqlalchemy import text
 from auth_utils import hash_password
 
+
 def reset_and_seed():
     print("Dropping existing tenant schemas and resetting database...")
     with engine.connect() as conn:
         conn.execute(text("DROP SCHEMA IF EXISTS tenant_company_a CASCADE;"))
         conn.execute(text("DROP SCHEMA IF EXISTS tenant_company_b CASCADE;"))
         conn.execute(text("DROP SCHEMA IF EXISTS tenant_company_c CASCADE;"))
-        conn.execute(text("DROP TABLE IF EXISTS public.tenant_accounts CASCADE;"))
-        
+        conn.execute(
+            text("DROP TABLE IF EXISTS public.tenant_accounts CASCADE;"))
+
         conn.execute(text("CREATE SCHEMA IF NOT EXISTS tenant_company_a;"))
         conn.execute(text("CREATE SCHEMA IF NOT EXISTS tenant_company_b;"))
         conn.execute(text("CREATE SCHEMA IF NOT EXISTS tenant_company_c;"))
@@ -23,7 +25,7 @@ def reset_and_seed():
     def provision_tenant_schema(schema_name: str, tenant_type: str):
         with engine.connect() as conn:
             conn.execute(text(f"SET search_path TO {schema_name};"))
-            
+
             # ALL tenants get core clients table
             conn.execute(text("""
                 CREATE TABLE IF NOT EXISTS clients (
@@ -38,86 +40,82 @@ def reset_and_seed():
                 );
             """))
 
-            # Vertical: Insurance
-            # Vertical: Insurance
-            if tenant_type == "insurance":
-                conn.execute(text("""
-                    CREATE TABLE IF NOT EXISTS insurance_policies (
-                        id SERIAL PRIMARY KEY,
-                        client_id INT NOT NULL REFERENCES clients(id) ON DELETE CASCADE,
-                        policy_number VARCHAR(100) NOT NULL,
-                        policy_type VARCHAR(100) DEFAULT 'General',
-                        coverage_amount NUMERIC(12, 2),
-                        deductible NUMERIC(10, 2) DEFAULT 0.00,
-                        status VARCHAR(50) DEFAULT 'Active',
-                        start_date TIMESTAMP,
-                        end_date TIMESTAMP,
-                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-                    );
 
-                    CREATE TABLE IF NOT EXISTS vehicles (
-                        id SERIAL PRIMARY KEY,
-                        policy_id INT REFERENCES insurance_policies(id) ON DELETE CASCADE,
-                        client_id INT REFERENCES clients(id) ON DELETE CASCADE,
-                        make VARCHAR(100) NOT NULL,
-                        model VARCHAR(100) NOT NULL,
-                        year INT NOT NULL,
-                        vin VARCHAR(100),
-                        license_plate VARCHAR(50),
-                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-                    );
+           # Insurance Vertical
+if tenant_type == "insurance":
+    conn.execute(text("""
+        CREATE TABLE IF NOT EXISTS insurance_policies (
+            id SERIAL PRIMARY KEY,
+            client_id INT NOT NULL REFERENCES clients(id) ON DELETE CASCADE,
+            policy_number VARCHAR(100) NOT NULL,
+            policy_type VARCHAR(100) DEFAULT 'General',
+            coverage_amount NUMERIC(12, 2),
+            deductible NUMERIC(10, 2) DEFAULT 0.00,
+            status VARCHAR(50) DEFAULT 'Active',
+            start_date TIMESTAMP,
+            end_date TIMESTAMP,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        );
 
-                    CREATE TABLE IF NOT EXISTS properties (
-                        id SERIAL PRIMARY KEY,
-                        policy_id INT REFERENCES insurance_policies(id) ON DELETE CASCADE,
-                        client_id INT REFERENCES clients(id) ON DELETE CASCADE,
-                        property_type VARCHAR(100) DEFAULT 'Residential',
-                        address VARCHAR(250) NOT NULL,
-                        estimated_value NUMERIC(12, 2),
-                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-                    );
-                """))
+        CREATE TABLE IF NOT EXISTS vehicles (
+            id VARCHAR PRIMARY KEY,
+            client_id INT NOT NULL REFERENCES clients(id) ON DELETE CASCADE,
+            manufacturer VARCHAR(100) NOT NULL,
+            model VARCHAR(100) NOT NULL,
+            year INT NOT NULL,
+            plate_no VARCHAR(8) NOT NULL,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        );
 
-            # Vertical: Legal
-            if tenant_type == "legal":
-                conn.execute(text("""
-                    CREATE TABLE IF NOT EXISTS legal_cases (
-                        id SERIAL PRIMARY KEY,
-                        client_id INT NOT NULL REFERENCES clients(id) ON DELETE CASCADE,
-                        case_number VARCHAR(100) NOT NULL,
-                        case_type VARCHAR(100) NOT NULL,
-                        court VARCHAR(255),
-                        status VARCHAR(50) DEFAULT 'Open',
-                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-                    );
+        CREATE TABLE IF NOT EXISTS properties (
+            id VARCHAR PRIMARY KEY,
+            client_id INT NOT NULL REFERENCES clients(id) ON DELETE CASCADE,
+            property_type VARCHAR(100) NOT NULL,
+            area FLOAT NOT NULL,
+            address VARCHAR(255),
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        );
+    """))
 
-                    CREATE TABLE IF NOT EXISTS evidences (
-                        id SERIAL PRIMARY KEY,
-                        case_id INT NOT NULL REFERENCES legal_cases(id) ON DELETE CASCADE,
-                        title VARCHAR(255) NOT NULL,
-                        description TEXT,
-                        evidence_type VARCHAR(100),
-                        storage_location VARCHAR(255),
-                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-                    );
+# Legal Vertical
+if tenant_type == "legal":
+    conn.execute(text("""
+        CREATE TABLE IF NOT EXISTS legal_cases (
+            id SERIAL PRIMARY KEY,
+            client_id INT NOT NULL REFERENCES clients(id) ON DELETE CASCADE,
+            case_number VARCHAR(100) NOT NULL,
+            case_type VARCHAR(100) NOT NULL,
+            court VARCHAR(255),
+            status VARCHAR(50) DEFAULT 'Open',
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        );
 
-                    CREATE TABLE IF NOT EXISTS witnesses (
-                        id SERIAL PRIMARY KEY,
-                        case_id INT NOT NULL REFERENCES legal_cases(id) ON DELETE CASCADE,
-                        full_name VARCHAR(150) NOT NULL,
-                        phone VARCHAR(50),
-                        email VARCHAR(100),
-                        statement TEXT,
-                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-                    );
-                """))
+        CREATE TABLE IF NOT EXISTS evidences (
+            id VARCHAR PRIMARY KEY,
+            client_id INT NOT NULL REFERENCES clients(id) ON DELETE CASCADE,
+            evidence_type VARCHAR(100) NOT NULL,
+            evidence_detail VARCHAR(100) NOT NULL,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        );
 
-            # Universal Sub-Resources (All tenants get these with dynamic FKs)
-            case_fk = "REFERENCES legal_cases(id) ON DELETE CASCADE" if tenant_type == "legal" else ""
-            policy_fk = "REFERENCES insurance_policies(id) ON DELETE CASCADE" if tenant_type == "insurance" else ""
+        CREATE TABLE IF NOT EXISTS witnesses (
+            id VARCHAR PRIMARY KEY,
+            client_id INT NOT NULL REFERENCES clients(id) ON DELETE CASCADE,
+            name VARCHAR(100) NOT NULL,
+            age FLOAT NOT NULL,
+            phone VARCHAR(10) NOT NULL,
+            email VARCHAR(30) NOT NULL,
+            address VARCHAR(255),
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        );
+    """))
 
-            # Notes
-            conn.execute(text(f"""
+    # Universal Sub-Resources (All tenants get these with dynamic FKs)
+    case_fk = "REFERENCES legal_cases(id) ON DELETE CASCADE" if tenant_type == "legal" else ""
+    policy_fk = "REFERENCES insurance_policies(id) ON DELETE CASCADE" if tenant_type == "insurance" else ""
+
+    # Notes
+    conn.execute(text(f"""
                 CREATE TABLE IF NOT EXISTS notes (
                     id SERIAL PRIMARY KEY,
                     author_name VARCHAR(100) NOT NULL DEFAULT 'System User',
@@ -131,8 +129,8 @@ def reset_and_seed():
                 );
             """))
 
-            # Documents
-            conn.execute(text(f"""
+    # Documents
+    conn.execute(text(f"""
                 CREATE TABLE IF NOT EXISTS documents (
                     id SERIAL PRIMARY KEY,
                     file_name VARCHAR(255) NOT NULL,
@@ -148,8 +146,8 @@ def reset_and_seed():
                 );
             """))
 
-            # Billing Entries
-            conn.execute(text(f"""
+    # Billing Entries
+    conn.execute(text(f"""
                 CREATE TABLE IF NOT EXISTS billing_entries (
                     id SERIAL PRIMARY KEY,
                     description VARCHAR(255) NOT NULL,
@@ -164,7 +162,7 @@ def reset_and_seed():
                 );
             """))
 
-            conn.commit()
+    conn.commit()
 
     print("Provisioning tenant schemas according to vertical types...")
     provision_tenant_schema("tenant_company_a", "insurance")
@@ -183,13 +181,16 @@ def reset_and_seed():
         db.add(admin)
 
     tenants = [
-        models.TenantAccount(company_name="company-a", password_hash=TENANT_HASH, tenant_type="insurance"),
-        models.TenantAccount(company_name="company-b", password_hash=TENANT_HASH, tenant_type="general"),
-        models.TenantAccount(company_name="company-c", password_hash=TENANT_HASH, tenant_type="legal"),
+        models.TenantAccount(company_name="company-a",
+                             password_hash=TENANT_HASH, tenant_type="insurance"),
+        models.TenantAccount(company_name="company-b",
+                             password_hash=TENANT_HASH, tenant_type="general"),
+        models.TenantAccount(company_name="company-c",
+                             password_hash=TENANT_HASH, tenant_type="legal"),
     ]
     db.add_all(tenants)
     db.commit()
-    
+
     # 3. Seed Mock Data Tailored to Each Schema
     print("Seeding Company A (Insurance)...")
     with engine.connect() as conn:

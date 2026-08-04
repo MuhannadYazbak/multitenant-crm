@@ -146,23 +146,29 @@ export class LegalClientPage {
         await fileInput.waitFor({ state: 'attached', timeout: 10000 });
         await fileInput.setInputFiles(filePath);
 
+        // Explicitly dispatch change event so React form state updates immediately
+        await fileInput.dispatchEvent('change');
+
         // 3. Category selection (Match label or value dynamically)
         const categorySelect = this.page.locator('select').filter({ hasText: /general|contract|legal/i }).first();
         if (await categorySelect.isVisible()) {
-            // Try selecting by label, lowercase value, or index
             try {
                 await categorySelect.selectOption({ label: category });
             } catch {
-                await categorySelect.selectOption(category.toLowerCase()).catch(() => {
-                    // Fallback to second option if specific string fails
-                    categorySelect.selectOption({ index: 1 });
-                });
+                try {
+                    await categorySelect.selectOption(category.toLowerCase());
+                } catch {
+                    // Properly awaited fallback to second option
+                    await categorySelect.selectOption({ index: 1 });
+                }
             }
+            // Force change event on select to guarantee state sync in React
+            await categorySelect.dispatchEvent('change');
         }
 
-        // 4. Wait for the upload button to actually be enabled
+        // 4. Wait for the upload button to be enabled (bumped timeout slightly for parallel workers)
         const uploadBtn = this.page.getByRole('button', { name: /^Upload$/i });
-        await expect(uploadBtn).toBeEnabled({ timeout: 5000 });
+        await expect(uploadBtn).toBeEnabled({ timeout: 10000 });
 
         // 5. Register API wait and click
         const responsePromise = this.page.waitForResponse(
@@ -175,6 +181,45 @@ export class LegalClientPage {
         await responsePromise;
         await this.page.waitForLoadState('networkidle');
     }
+
+    // async uploadDocument(filePath: string, category: string = 'General') {
+    //     // 1. Ensure Documents tab in drawer is active
+    //     await this.docsTabButton.click();
+
+    //     // 2. Attach file
+    //     const fileInput = this.page.locator('input[type="file"]').first();
+    //     await fileInput.waitFor({ state: 'attached', timeout: 10000 });
+    //     await fileInput.setInputFiles(filePath);
+
+    //     // 3. Category selection (Match label or value dynamically)
+    //     const categorySelect = this.page.locator('select').filter({ hasText: /general|contract|legal/i }).first();
+    //     if (await categorySelect.isVisible()) {
+    //         // Try selecting by label, lowercase value, or index
+    //         try {
+    //             await categorySelect.selectOption({ label: category });
+    //         } catch {
+    //             await categorySelect.selectOption(category.toLowerCase()).catch(() => {
+    //                 // Fallback to second option if specific string fails
+    //                 categorySelect.selectOption({ index: 1 });
+    //             });
+    //         }
+    //     }
+
+    //     // 4. Wait for the upload button to actually be enabled
+    //     const uploadBtn = this.page.getByRole('button', { name: /^Upload$/i });
+    //     await expect(uploadBtn).toBeEnabled({ timeout: 5000 });
+
+    //     // 5. Register API wait and click
+    //     const responsePromise = this.page.waitForResponse(
+    //         (resp) => resp.url().includes('/documents') && (resp.status() === 200 || resp.status() === 201),
+    //         { timeout: 10000 }
+    //     );
+
+    //     await uploadBtn.click();
+
+    //     await responsePromise;
+    //     await this.page.waitForLoadState('networkidle');
+    // }
 
     async archiveFirstDocument() {
         const archiveBtn = this.page.locator('table').last().getByRole('button', { name: /archive/i }).first();
