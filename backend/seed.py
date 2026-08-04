@@ -40,82 +40,81 @@ def reset_and_seed():
                 );
             """))
 
+            # Insurance Vertical
+            if tenant_type == "insurance":
+                conn.execute(text("""
+                    CREATE TABLE IF NOT EXISTS insurance_policies (
+                        id SERIAL PRIMARY KEY,
+                        client_id INT NOT NULL REFERENCES clients(id) ON DELETE CASCADE,
+                        policy_number VARCHAR(100) NOT NULL,
+                        policy_type VARCHAR(100) DEFAULT 'General',
+                        coverage_amount NUMERIC(12, 2),
+                        deductible NUMERIC(10, 2) DEFAULT 0.00,
+                        status VARCHAR(50) DEFAULT 'Active',
+                        start_date TIMESTAMP,
+                        end_date TIMESTAMP,
+                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                    );
 
-           # Insurance Vertical
-if tenant_type == "insurance":
-    conn.execute(text("""
-        CREATE TABLE IF NOT EXISTS insurance_policies (
-            id SERIAL PRIMARY KEY,
-            client_id INT NOT NULL REFERENCES clients(id) ON DELETE CASCADE,
-            policy_number VARCHAR(100) NOT NULL,
-            policy_type VARCHAR(100) DEFAULT 'General',
-            coverage_amount NUMERIC(12, 2),
-            deductible NUMERIC(10, 2) DEFAULT 0.00,
-            status VARCHAR(50) DEFAULT 'Active',
-            start_date TIMESTAMP,
-            end_date TIMESTAMP,
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-        );
+                    CREATE TABLE IF NOT EXISTS vehicles (
+                        id VARCHAR PRIMARY KEY,
+                        client_id INT NOT NULL REFERENCES clients(id) ON DELETE CASCADE,
+                        manufacturer VARCHAR(100) NOT NULL,
+                        model VARCHAR(100) NOT NULL,
+                        year INT NOT NULL,
+                        plate_no VARCHAR(8) NOT NULL,
+                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                    );
 
-        CREATE TABLE IF NOT EXISTS vehicles (
-            id VARCHAR PRIMARY KEY,
-            client_id INT NOT NULL REFERENCES clients(id) ON DELETE CASCADE,
-            manufacturer VARCHAR(100) NOT NULL,
-            model VARCHAR(100) NOT NULL,
-            year INT NOT NULL,
-            plate_no VARCHAR(8) NOT NULL,
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-        );
+                    CREATE TABLE IF NOT EXISTS properties (
+                        id VARCHAR PRIMARY KEY,
+                        client_id INT NOT NULL REFERENCES clients(id) ON DELETE CASCADE,
+                        property_type VARCHAR(100) NOT NULL,
+                        area FLOAT NOT NULL,
+                        address VARCHAR(255),
+                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                    );
+                """))
 
-        CREATE TABLE IF NOT EXISTS properties (
-            id VARCHAR PRIMARY KEY,
-            client_id INT NOT NULL REFERENCES clients(id) ON DELETE CASCADE,
-            property_type VARCHAR(100) NOT NULL,
-            area FLOAT NOT NULL,
-            address VARCHAR(255),
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-        );
-    """))
+            # Legal Vertical
+            if tenant_type == "legal":
+                conn.execute(text("""
+                    CREATE TABLE IF NOT EXISTS legal_cases (
+                        id SERIAL PRIMARY KEY,
+                        client_id INT NOT NULL REFERENCES clients(id) ON DELETE CASCADE,
+                        case_number VARCHAR(100) NOT NULL,
+                        case_type VARCHAR(100) NOT NULL,
+                        court VARCHAR(255),
+                        status VARCHAR(50) DEFAULT 'Open',
+                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                    );
 
-# Legal Vertical
-if tenant_type == "legal":
-    conn.execute(text("""
-        CREATE TABLE IF NOT EXISTS legal_cases (
-            id SERIAL PRIMARY KEY,
-            client_id INT NOT NULL REFERENCES clients(id) ON DELETE CASCADE,
-            case_number VARCHAR(100) NOT NULL,
-            case_type VARCHAR(100) NOT NULL,
-            court VARCHAR(255),
-            status VARCHAR(50) DEFAULT 'Open',
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-        );
+                    CREATE TABLE IF NOT EXISTS evidences (
+                        id VARCHAR PRIMARY KEY,
+                        client_id INT NOT NULL REFERENCES clients(id) ON DELETE CASCADE,
+                        evidence_type VARCHAR(100) NOT NULL,
+                        evidence_detail VARCHAR(100) NOT NULL,
+                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                    );
 
-        CREATE TABLE IF NOT EXISTS evidences (
-            id VARCHAR PRIMARY KEY,
-            client_id INT NOT NULL REFERENCES clients(id) ON DELETE CASCADE,
-            evidence_type VARCHAR(100) NOT NULL,
-            evidence_detail VARCHAR(100) NOT NULL,
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-        );
+                    CREATE TABLE IF NOT EXISTS witnesses (
+                        id VARCHAR PRIMARY KEY,
+                        client_id INT NOT NULL REFERENCES clients(id) ON DELETE CASCADE,
+                        name VARCHAR(100) NOT NULL,
+                        age FLOAT NOT NULL,
+                        phone VARCHAR(10) NOT NULL,
+                        email VARCHAR(30) NOT NULL,
+                        address VARCHAR(255),
+                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                    );
+                """))
 
-        CREATE TABLE IF NOT EXISTS witnesses (
-            id VARCHAR PRIMARY KEY,
-            client_id INT NOT NULL REFERENCES clients(id) ON DELETE CASCADE,
-            name VARCHAR(100) NOT NULL,
-            age FLOAT NOT NULL,
-            phone VARCHAR(10) NOT NULL,
-            email VARCHAR(30) NOT NULL,
-            address VARCHAR(255),
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-        );
-    """))
+            # Universal Sub-Resources (All tenants get these with dynamic FKs)
+            case_fk = "REFERENCES legal_cases(id) ON DELETE CASCADE" if tenant_type == "legal" else ""
+            policy_fk = "REFERENCES insurance_policies(id) ON DELETE CASCADE" if tenant_type == "insurance" else ""
 
-    # Universal Sub-Resources (All tenants get these with dynamic FKs)
-    case_fk = "REFERENCES legal_cases(id) ON DELETE CASCADE" if tenant_type == "legal" else ""
-    policy_fk = "REFERENCES insurance_policies(id) ON DELETE CASCADE" if tenant_type == "insurance" else ""
-
-    # Notes
-    conn.execute(text(f"""
+            # Notes
+            conn.execute(text(f"""
                 CREATE TABLE IF NOT EXISTS notes (
                     id SERIAL PRIMARY KEY,
                     author_name VARCHAR(100) NOT NULL DEFAULT 'System User',
@@ -129,8 +128,8 @@ if tenant_type == "legal":
                 );
             """))
 
-    # Documents
-    conn.execute(text(f"""
+            # Documents
+            conn.execute(text(f"""
                 CREATE TABLE IF NOT EXISTS documents (
                     id SERIAL PRIMARY KEY,
                     file_name VARCHAR(255) NOT NULL,
@@ -146,8 +145,8 @@ if tenant_type == "legal":
                 );
             """))
 
-    # Billing Entries
-    conn.execute(text(f"""
+            # Billing Entries
+            conn.execute(text(f"""
                 CREATE TABLE IF NOT EXISTS billing_entries (
                     id SERIAL PRIMARY KEY,
                     description VARCHAR(255) NOT NULL,
@@ -162,7 +161,7 @@ if tenant_type == "legal":
                 );
             """))
 
-    conn.commit()
+            conn.commit()
 
     print("Provisioning tenant schemas according to vertical types...")
     provision_tenant_schema("tenant_company_a", "insurance")
@@ -208,8 +207,6 @@ if tenant_type == "legal":
             SELECT setval(pg_get_serial_sequence('clients', 'id'), (SELECT MAX(id) FROM clients));
             SELECT setval(pg_get_serial_sequence('insurance_policies', 'id'), (SELECT MAX(id) FROM insurance_policies));
             SELECT setval(pg_get_serial_sequence('notes', 'id'), (SELECT MAX(id) FROM notes));
-            SELECT setval(pg_get_serial_sequence('vehicles', 'id'), COALESCE((SELECT MAX(id) FROM vehicles), 1));
-            SELECT setval(pg_get_serial_sequence('properties', 'id'), COALESCE((SELECT MAX(id) FROM properties), 1));
         """))
         conn.commit()
 
@@ -256,8 +253,6 @@ if tenant_type == "legal":
             SELECT setval(pg_get_serial_sequence('notes', 'id'), (SELECT MAX(id) FROM notes));
             SELECT setval(pg_get_serial_sequence('documents', 'id'), (SELECT MAX(id) FROM documents));
             SELECT setval(pg_get_serial_sequence('billing_entries', 'id'), (SELECT MAX(id) FROM billing_entries));
-            SELECT setval(pg_get_serial_sequence('evidences', 'id'), COALESCE((SELECT MAX(id) FROM evidences), 1));
-            SELECT setval(pg_get_serial_sequence('witnesses', 'id'), COALESCE((SELECT MAX(id) FROM witnesses), 1));
         """))
         conn.commit()
 
