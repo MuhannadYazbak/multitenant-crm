@@ -5,10 +5,12 @@ import jwt
 from datetime import datetime, timedelta, timezone
 from fastapi import HTTPException, status, Depends
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+import secrets
 
 SECRET_KEY = os.getenv("ADMIN_JWT_SECRET", "super_secret_jwt_admin_key_999")
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 60 * 8
+RESET_TOKEN_EXPIRE_MINUTES = 15
 
 security = HTTPBearer()
 
@@ -51,3 +53,26 @@ def get_current_admin(credentials: HTTPAuthorizationCredentials = Depends(securi
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Could not validate admin credentials",
         )
+
+def create_password_reset_token(email: str, tenant_slug: str = None) -> str:
+    """Creates a short-lived JWT specifically for password recovery."""
+    expire = datetime.now(timezone.utc) + timedelta(minutes=RESET_TOKEN_EXPIRE_MINUTES)
+    to_encode = {
+        "sub": email,
+        "type": "password_reset",
+        "tenant": tenant_slug,
+        "exp": expire
+    }
+    return jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
+
+def verify_password_reset_token(token: str) -> dict:
+    """Verifies and decodes a password reset token."""
+    try:
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        if payload.get("type") != "password_reset":
+            raise HTTPException(status_code=400, detail="Invalid token type")
+        return payload
+    except jwt.ExpiredSignatureError:
+        raise HTTPException(status_code=400, detail="Reset token has expired")
+    except jwt.PyJWTError:
+        raise HTTPException(status_code=400, detail="Invalid or corrupted reset token")
