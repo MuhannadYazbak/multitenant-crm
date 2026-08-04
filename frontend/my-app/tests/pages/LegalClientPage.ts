@@ -138,46 +138,36 @@ export class LegalClientPage {
     }
 
     async uploadDocument(filePath: string, category: string = 'General') {
-        // 1. Ensure Documents tab in drawer is active
-        await this.docsTabButton.click();
+        // 1. Click the "Documents" tab button inside TabsSection to reveal the upload form
+        const docsTabBtn = this.page.getByRole('button', { name: /Documents/i });
+        await docsTabBtn.click();
 
-        // 2. Attach file
-        const fileInput = this.page.locator('input[type="file"]').first();
+        // 2. Locate the file input and attach the file
+        const fileInput = this.page.locator('input[type="file"]');
         await fileInput.waitFor({ state: 'attached', timeout: 10000 });
         await fileInput.setInputFiles(filePath);
 
-        // Explicitly dispatch change event so React form state updates immediately
-        await fileInput.dispatchEvent('change');
-
-        // 3. Category selection (Match label or value dynamically)
-        const categorySelect = this.page.locator('select').filter({ hasText: /general|contract|legal/i }).first();
-        if (await categorySelect.isVisible()) {
-            try {
-                await categorySelect.selectOption({ label: category });
-            } catch {
-                try {
-                    await categorySelect.selectOption(category.toLowerCase());
-                } catch {
-                    // Properly awaited fallback to second option
-                    await categorySelect.selectOption({ index: 1 });
-                }
+        // 3. Select Category if provided (matches <select value={fileCategory}> in TabsSection)
+        if (category) {
+            const categorySelect = this.page.locator('form select').first();
+            if (await categorySelect.isVisible({ timeout: 2000 }).catch(() => false)) {
+                await categorySelect.selectOption({ label: category }).catch(async () => {
+                    await categorySelect.selectOption(category);
+                });
             }
-            // Force change event on select to guarantee state sync in React
-            await categorySelect.dispatchEvent('change');
         }
 
-        // 4. Wait for the upload button to be enabled (bumped timeout slightly for parallel workers)
+        // 4. Verify the Upload button is enabled (React state setSelectedFile updated)
         const uploadBtn = this.page.getByRole('button', { name: /^Upload$/i });
         await expect(uploadBtn).toBeEnabled({ timeout: 10000 });
 
-        // 5. Register API wait and click
+        // 5. Register API response listener for document upload call & submit form
         const responsePromise = this.page.waitForResponse(
             (resp) => resp.url().includes('/documents') && (resp.status() === 200 || resp.status() === 201),
             { timeout: 10000 }
         );
 
         await uploadBtn.click();
-
         await responsePromise;
         await this.page.waitForLoadState('networkidle');
     }
@@ -244,6 +234,47 @@ export class LegalClientPage {
         await archiveCaseBtn.waitFor({ state: 'visible' });
         await archiveCaseBtn.click({ force: true });
         await this.page.waitForLoadState('networkidle');
+    }
+
+    async addNote(authorName: string, content: string, noteType: string = 'General', isPinned: boolean = false) {
+        // Switch to Notes tab if not already active
+        const notesTabBtn = this.page.getByRole('button', { name: /Notes/i });
+        await notesTabBtn.click();
+
+        await this.page.fill('input[placeholder="Author Name"]', authorName);
+        await this.page.fill('textarea[placeholder="Type note details..."]', content);
+
+        if (isPinned) {
+            await this.page.check('input[type="checkbox"]');
+        }
+
+        const responsePromise = this.page.waitForResponse(
+            (resp) => resp.url().includes('/notes') && (resp.status() === 200 || resp.status() === 201)
+        );
+
+        await this.page.getByRole('button', { name: /Post Note/i }).click();
+        await responsePromise;
+    }
+
+    async addBillingEntry(description: string, hours: string, rate: string = '200', isPaid: boolean = false) {
+        // Switch to Billing Ledger tab
+        const billingTabBtn = this.page.getByRole('button', { name: /Billing Ledger/i });
+        await billingTabBtn.click();
+
+        await this.page.fill('input[placeholder="Service description"]', description);
+        await this.page.fill('input[placeholder="Hours"]', hours);
+        await this.page.fill('input[placeholder="Hourly Rate ($)"]', rate);
+
+        if (isPaid) {
+            await this.page.check('input[type="checkbox"]');
+        }
+
+        const responsePromise = this.page.waitForResponse(
+            (resp) => resp.url().includes('/billing') && (resp.status() === 200 || resp.status() === 201)
+        );
+
+        await this.page.getByRole('button', { name: /Log Time/i }).click();
+        await responsePromise;
     }
 
     async clickEvidenceTab() {
