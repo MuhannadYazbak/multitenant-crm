@@ -171,8 +171,8 @@ def reset_and_seed():
     # 2. Seed Public Tenant Accounts & Admin
     db = SessionLocal()
 
-    ADMIN_HASH = hash_password("admin123")
-    TENANT_HASH = hash_password("supersecret123")
+    ADMIN_HASH = hash_password("NewAdminSecret456!")
+    TENANT_HASH = hash_password("NewTenantSecret123!")
 
     admin_user = db.query(models.Admin).filter_by(username="admin").first()
     if not admin_user:
