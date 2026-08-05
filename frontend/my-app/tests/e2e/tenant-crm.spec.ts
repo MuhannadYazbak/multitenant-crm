@@ -17,7 +17,7 @@ test.describe("Tenant CRM Full End-to-End Suite", () => {
   test("complete client lifecycle: login, create, view profile, edit, search, delete", async ({ page }) => {
     // 1. Workspace Login
     await tenantLogin.goto();
-    await tenantLogin.login("company-a", "supersecret123");
+    await tenantLogin.login("company-a", "NewTenantSecret123!");
     await expect(page).toHaveURL(/\/company-a\/mypage/);
 
     // 2. Provision New Client with dynamic dynamic email/name to avoid DB 500 unique constraints
