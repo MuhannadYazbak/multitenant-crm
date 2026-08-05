@@ -88,60 +88,60 @@ export class BaseClientPage {
 
     // pages/BaseClientPage.ts
 
-    async uploadDocument(filePath: string) {
-        // 1. Set input files on the file locator
-        await this.fileInput.setInputFiles(filePath);
+    // async uploadDocument(filePath: string) {
+    //     // 1. Set input files on the file locator
+    //     await this.fileInput.setInputFiles(filePath);
 
-        // 2. Dispatch change event to guarantee React/Vue state updates in headless CI
-        await this.fileInput.dispatchEvent('change');
-        await this.fileInput.dispatchEvent('input');
+    //     // 2. Dispatch change event to guarantee React/Vue state updates in headless CI
+    //     await this.fileInput.dispatchEvent('change');
+    //     await this.fileInput.dispatchEvent('input');
 
-        // 3. Wait for the upload button to become enabled
-        await expect(this.uploadDocButton).toBeEnabled({ timeout: 10000 });
-
-        // 4. Trigger upload
-        const responsePromise = this.page.waitForResponse(
-            (res) => res.url().includes('/documents') && res.status() === 200
-        );
-        await this.uploadDocButton.click();
-        await responsePromise;
-    }
-
-    // async uploadDocument(filePath: string, category: string = 'General') {
-    //     // 1. Ensure the Documents tab is clicked and active
-    //     await this.docsTabButton.click();
-
-    //     // 2. Locate the file input, ensure attached and visible/ready
-    //     const fileInput = this.page.locator('input[type="file"]').first();
-    //     await fileInput.waitFor({ state: 'attached', timeout: 10000 });
-
-    //     // 3. Attach file and dispatch change event to trigger React state (setSelectedFile)
-    //     await fileInput.setInputFiles(filePath);
-    //     await fileInput.dispatchEvent('change');
-
-    //     // 4. Handle category selection if present
-    //     if (category) {
-    //         const categorySelect = this.page.locator('form select, div[role="dialog"] select').first();
-    //         if (await categorySelect.isVisible({ timeout: 2000 }).catch(() => false)) {
-    //             await categorySelect.selectOption({ label: category }).catch(async () => {
-    //                 await categorySelect.selectOption(category);
-    //             });
-    //         }
-    //     }
-
-    //     // 5. Wait for the upload button to become enabled
+    //     // 3. Wait for the upload button to become enabled
     //     await expect(this.uploadDocButton).toBeEnabled({ timeout: 10000 });
 
-    //     // 6. Set up API response promise & click upload
+    //     // 4. Trigger upload
     //     const responsePromise = this.page.waitForResponse(
-    //         (resp) => resp.url().includes('/documents') && (resp.status() === 200 || resp.status() === 201),
-    //         { timeout: 10000 }
+    //         (res) => res.url().includes('/documents') && res.status() === 200
     //     );
-
     //     await this.uploadDocButton.click();
     //     await responsePromise;
-    //     await this.page.waitForLoadState('networkidle');
     // }
+
+    async uploadDocument(filePath: string, category: string = 'General') {
+        // 1. Ensure the Documents tab is clicked and active
+        await this.docsTabButton.click();
+
+        // 2. Locate the file input, ensure attached and visible/ready
+        const fileInput = this.page.locator('input[type="file"]').first();
+        await fileInput.waitFor({ state: 'attached', timeout: 10000 });
+
+        // 3. Attach file and dispatch change event to trigger React state (setSelectedFile)
+        await fileInput.setInputFiles(filePath);
+        await fileInput.dispatchEvent('change');
+
+        // 4. Handle category selection if present
+        if (category) {
+            const categorySelect = this.page.locator('form select, div[role="dialog"] select').first();
+            if (await categorySelect.isVisible({ timeout: 2000 }).catch(() => false)) {
+                await categorySelect.selectOption({ label: category }).catch(async () => {
+                    await categorySelect.selectOption(category);
+                });
+            }
+        }
+
+        // 5. Wait for the upload button to become enabled
+        await expect(this.uploadDocButton).toBeEnabled({ timeout: 10000 });
+
+        // 6. Set up API response promise & click upload
+        const responsePromise = this.page.waitForResponse(
+            (resp) => resp.url().includes('/documents') && (resp.status() === 200 || resp.status() === 201),
+            { timeout: 10000 }
+        );
+
+        await this.uploadDocButton.click();
+        await responsePromise;
+        await this.page.waitForLoadState('networkidle');
+    }
 
     // async uploadDocument(filePath: string, category: string = 'General') {
     //     await this.docsTabButton.click();
