@@ -294,7 +294,7 @@ def delete_billing_entry(case_id: int, billing_id: int, db: Session = Depends(ge
 # EVIDENCE ENDPOINTS
 # -------------------------------------------------------------------
 
-@router.get("/clients/{client_id}/evidneces", response_model=List[schemas.EvidenceResponse])
+@router.get("/clients/{client_id}/evidences", response_model=List[schemas.EvidenceResponse])
 def get_client_evidences(
     client_id: int,
     db: Session = Depends(get_db_for_tenant)

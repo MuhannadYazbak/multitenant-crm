@@ -19,7 +19,7 @@ test.describe("Admin System Lifecycle Suite", () => {
 
     // 1. Log in as superadmin
     await adminLogin.goto();
-    await adminLogin.login("admin", "admin123");
+    await adminLogin.login("admin", "NewAdminSecret456!");
     await expect(page).toHaveURL("/admin/dashboard");
   });
 
@@ -38,4 +38,8 @@ test.describe("Admin System Lifecycle Suite", () => {
     await adminDashboard.changeTenantStatus(testTenant.name, "Activate");
     await adminDashboard.verifyTenantStatus(testTenant.name, "ACTIVE");
   });
+
+  test.afterAll(async ({ browser }) => {
+  // Call admin delete endpoint or DB clean script to drop the test tenant schema
+});
 });

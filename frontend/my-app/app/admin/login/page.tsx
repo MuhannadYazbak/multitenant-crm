@@ -45,7 +45,7 @@ export default function AdminLoginPage() {
   return (
     <div className="min-h-screen flex items-center justify-center bg-slate-900 text-slate-100 p-4">
       <div className="w-full max-w-md bg-slate-800 border border-slate-700 rounded-xl p-8 shadow-2xl">
-        
+
         {/* Header */}
         <div className="mb-6 text-center">
           <span className="inline-block px-3 py-1 bg-red-500/10 text-red-400 border border-red-500/20 text-xs font-semibold uppercase tracking-wider rounded-full mb-2">
@@ -125,7 +125,15 @@ export default function AdminLoginPage() {
             Back to Tenant Login
           </Link>
         </div>
-
+        <div className="flex items-center justify-between text-sm">
+          <span className="text-gray-500">Forgot credentials?</span>
+          <Link
+            href="/forgot-password"
+            className="text-blue-600 dark:text-blue-400 hover:underline font-medium"
+          >
+            Forgot Password?
+          </Link>
+        </div>
       </div>
     </div>
   );

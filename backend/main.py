@@ -9,7 +9,7 @@ from sqlalchemy import text
 from database import SessionLocal, engine, Base, get_db_for_tenant, get_db
 import models
 import schemas  # Clean import from schemas.py
-from routers import insurance, dashboard, legal, admin, tabs_manager
+from routers import insurance, dashboard, legal, admin, tabs_manager, auth
 from sqlalchemy.orm.attributes import flag_modified
 from sqlalchemy import func
 from passlib.context import CryptContext
@@ -43,6 +43,7 @@ app.include_router(dashboard.router)
 app.include_router(legal.router)
 app.include_router(admin.router)
 app.include_router(tabs_manager.router)
+app.include_router(auth.router)
 
 # --- API ENDPOINTS ---
 

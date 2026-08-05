@@ -748,7 +748,7 @@ export async function fetchClientEvidences(
 ): Promise<EvidenceResponse[]> {
   const url = `${API_BASE_URL}/api/legal/clients/${clientId}/evidences`
   console.log("Fetching evidences from:", url);
-  const res = await fetch(`${API_BASE_URL}/api/insurance/clients/${clientId}/evidences`, {
+  const res = await fetch(`${API_BASE_URL}/api/legal/clients/${clientId}/evidences`, {
     headers: { "X-Tenant": tenant },
   });
 

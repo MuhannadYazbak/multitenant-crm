@@ -92,6 +92,15 @@ export default function LoginPage() {
             Admin Tenant Portal →
           </Link>
         </div>
+        <div className="flex items-center justify-between text-sm">
+          <span className="text-gray-500">Forgot credentials?</span>
+          <Link
+            href="/forgot-password"
+            className="text-blue-600 dark:text-blue-400 hover:underline font-medium"
+          >
+            Forgot Password?
+          </Link>
+        </div>
       </div>
     </div>
   );
