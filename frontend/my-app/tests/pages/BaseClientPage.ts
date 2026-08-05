@@ -83,30 +83,6 @@ export class BaseClientPage {
     }
 
     // --- SHARED DOCUMENTS ACTIONS ---
-
-    // tests/pages/BaseClientPage.ts
-
-    // pages/BaseClientPage.ts
-
-    // async uploadDocument(filePath: string) {
-    //     // 1. Set input files on the file locator
-    //     await this.fileInput.setInputFiles(filePath);
-
-    //     // 2. Dispatch change event to guarantee React/Vue state updates in headless CI
-    //     await this.fileInput.dispatchEvent('change');
-    //     await this.fileInput.dispatchEvent('input');
-
-    //     // 3. Wait for the upload button to become enabled
-    //     await expect(this.uploadDocButton).toBeEnabled({ timeout: 10000 });
-
-    //     // 4. Trigger upload
-    //     const responsePromise = this.page.waitForResponse(
-    //         (res) => res.url().includes('/documents') && res.status() === 200
-    //     );
-    //     await this.uploadDocButton.click();
-    //     await responsePromise;
-    // }
-
     async uploadDocument(filePath: string, category: string = 'General') {
         // 1. Ensure the Documents tab is clicked and active
         await this.docsTabButton.click();
@@ -143,29 +119,6 @@ export class BaseClientPage {
         await this.page.waitForLoadState('networkidle');
     }
 
-    // async uploadDocument(filePath: string, category: string = 'General') {
-    //     await this.docsTabButton.click();
-
-    //     await this.fileInput.waitFor({ state: 'attached', timeout: 10000 });
-    //     await this.fileInput.setInputFiles(filePath);
-
-    //     if (category && await this.categorySelect.isVisible({ timeout: 2000 }).catch(() => false)) {
-    //         await this.categorySelect.selectOption({ label: category }).catch(async () => {
-    //             await this.categorySelect.selectOption(category);
-    //         });
-    //     }
-
-    //     await expect(this.uploadDocButton).toBeEnabled({ timeout: 10000 });
-
-    //     const responsePromise = this.page.waitForResponse(
-    //         (resp) => resp.url().includes('/documents') && (resp.status() === 200 || resp.status() === 201),
-    //         { timeout: 10000 }
-    //     );
-
-    //     await this.uploadDocButton.click();
-    //     await responsePromise;
-    //     await this.page.waitForLoadState('networkidle');
-    // }
 
     async archiveFirstDocument() {
         await this.docsTabButton.click();
