@@ -73,6 +73,7 @@ export default function ForgotPasswordPage() {
               </label>
               <input
                 type="text"
+                name='identifier'
                 required
                 value={identifier}
                 onChange={(e) => setIdentifier(e.target.value)}

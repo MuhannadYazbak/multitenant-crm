@@ -77,6 +77,7 @@ function ResetPasswordForm() {
         </label>
         <input
           type="password"
+          name='new_password'
           required
           minLength={6}
           value={newPassword}

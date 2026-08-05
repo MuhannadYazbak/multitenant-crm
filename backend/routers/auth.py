@@ -9,9 +9,12 @@ from auth_utils import hash_password, create_password_reset_token, verify_passwo
 
 router = APIRouter(prefix="/auth", tags=["Auth & Security"])
 
+# Environment Detection
+ENVIRONMENT = os.getenv("ENVIRONMENT", "development").lower()
+IS_DEV_OR_TEST = ENVIRONMENT in ["development", "test"]
+
 # Configure Resend
 RESEND_API_KEY = os.getenv("RESEND_API_KEY")
-# Target email for dev testing (or grab from env)
 NOTIFICATION_EMAIL = os.getenv("DEV_NOTIFICATION_EMAIL", "your_email@example.com")
 
 if RESEND_API_KEY:
@@ -34,10 +37,9 @@ def send_password_reset_email(to_email: str, reset_url: str):
         return
 
     try:
-        # Note: Free tier without custom domain sends from onboarding@resend.dev
         resend.Emails.send({
             "from": "SaaS Platform <onboarding@resend.dev>",
-            "to": [to_email],  # Free tier delivers to your registered account email
+            "to": [to_email],
             "subject": "🔑 Reset Your Password",
             "html": f"""
                 <div style="font-family: sans-serif; padding: 20px; max-width: 500px;">
@@ -54,9 +56,9 @@ def send_password_reset_email(to_email: str, reset_url: str):
                 </div>
             """
         })
-        print(f"📧 Reset email successfully dispatched to {to_email}")
+        print(f"[EMAIL] Reset email successfully dispatched to {to_email}")
     except Exception as e:
-        print(f"❌ Resend Email Failed: {e}")
+        print(f"[ERROR] Resend Email Failed: {e}")
 
 
 @router.post("/forgot-password")
@@ -68,7 +70,6 @@ def request_password_reset(payload: ForgotPasswordPayload, db: Session = Depends
     if not account:
         return generic_response
 
-    # Store identifier + account_type ("admin" or "tenant") in token
     token = create_password_reset_token(
         email=account["identifier"],
         tenant_slug=account_type
@@ -76,17 +77,23 @@ def request_password_reset(payload: ForgotPasswordPayload, db: Session = Depends
     
     reset_url = f"http://localhost:3000/reset-password?token={token}"
     
-    # Dev console log for instant testing
     print("\n" + "="*50)
-    print(f"🔑 PASSWORD RESET REQUEST")
+    print(f"[AUTH] PASSWORD RESET REQUEST")
     print(f"Account Type : {account_type.upper()}")
     print(f"Identifier   : {payload.identifier}")
     print(f"Reset Link   : {reset_url}")
     print("="*50 + "\n")
 
-    # Send email dispatch call fixed here:
     target_email = account.get("email") or NOTIFICATION_EMAIL
     send_password_reset_email(target_email, reset_url)
+
+    # Attach reset details in Dev/Test environments for E2E interception
+    if IS_DEV_OR_TEST:
+        return {
+            **generic_response,
+            "dev_reset_url": reset_url,
+            "dev_token": token
+        }
 
     return generic_response
 
