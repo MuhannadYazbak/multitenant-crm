@@ -906,3 +906,29 @@ export async function deleteWitness(
     throw new Error(errorData?.detail || "Failed to delete witness");
   }
 }
+
+async function handleSubscribe(tenantId: string, priceId: string) {
+  priceId = ''
+  try {
+    const response = await fetch('http://localhost:8001/api/v1/subscriptions/create-checkout-session', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Tenant-ID': tenantId,
+      },
+      body: JSON.stringify({
+        price_id: priceId, // Your Stripe recurring price ID
+        success_url: `${window.location.origin}/`,
+        cancel_url: `${window.location.origin}/dashboard?subscription=cancelled`,
+      }),
+    });
+
+    const data = await response.json();
+    if (data.checkout_url) {
+      // Redirect user to Stripe's Hosted Checkout page
+      window.location.href = data.checkout_url;
+    }
+  } catch (err) {
+    console.error('Failed to initiate subscription:', err);
+  }
+}

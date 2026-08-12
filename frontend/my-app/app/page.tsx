@@ -26,9 +26,17 @@ export default function LoginPage() {
     try {
       const data = await loginTenant(companyInput.trim(), password);
 
-      // Fall back to lowercased input if backend doesn't explicitly return tenant slug
+      // 1. Extract token & tenant slug from API response
+      const token = data.access_token || data.token || data.auth_token || "authenticated";
       const tenantSlug = data.tenant || data.tenant_slug || companyInput.trim().toLowerCase();
+
+      // 2. ✅ SET COOKIES FOR PROXY / MIDDLEWARE WITH path=/
+      document.cookie = `auth_token=${token}; path=/; max-age=86400; SameSite=Lax`;
+      document.cookie = `user_tenant=${tenantSlug}; path=/; max-age=86400; SameSite=Lax`;
+
+      // 3. Navigate to tenant workspace
       router.push(`/${tenantSlug}/mypage`);
+      router.refresh(); // Refresh router cache to ensure proxy picks up new cookies
     } catch (err: any) {
       setError(err.message || "Invalid credentials. Please try again.");
     } finally {
@@ -78,12 +86,16 @@ export default function LoginPage() {
             suppressHydrationWarning
             type="submit"
             disabled={loading}
-            className={`p-2.5 rounded font-bold text-white text-sm transition ${loading ? "bg-slate-400 cursor-not-allowed" : "bg-blue-600 hover:bg-blue-700"
-              }`}
+            className={`p-2.5 rounded font-bold text-white text-sm transition ${
+              loading
+                ? "bg-slate-400 cursor-not-allowed"
+                : "bg-blue-600 hover:bg-blue-700"
+            }`}
           >
             {loading ? "Verifying..." : "Login to Workspace"}
           </button>
         </form>
+
         <div className="mt-6 text-center">
           <Link
             href="/admin/login"
@@ -92,7 +104,8 @@ export default function LoginPage() {
             Admin Tenant Portal →
           </Link>
         </div>
-        <div className="flex items-center justify-between text-sm">
+
+        <div className="flex items-center justify-between text-sm mt-4">
           <span className="text-gray-500">Forgot credentials?</span>
           <Link
             href="/forgot-password"

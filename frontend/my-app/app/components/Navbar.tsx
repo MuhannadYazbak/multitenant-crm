@@ -11,11 +11,10 @@ export default function Navbar({ tenantName }: NavbarProps) {
   const router = useRouter();
 
   const handleLogout = () => {
-    // Clear any token or session storage if added later
-    // localStorage.removeItem("token"); 
-
-    // Redirect straight back to the login page
+    document.cookie = "auth_token=; path=/; max-age=0;";
+    document.cookie = "user_tenant=; path=/; max-age=0;";
     router.push("/");
+    router.refresh();
   };
 
   return (
@@ -29,7 +28,7 @@ export default function Navbar({ tenantName }: NavbarProps) {
 
       <button
         suppressHydrationWarning
-        onClick={() => router.push("/")}
+        onClick={handleLogout}
         className="bg-red-500 hover:bg-red-600 text-white text-sm px-3 py-1.5 rounded transition font-medium"
       >
         Log Out

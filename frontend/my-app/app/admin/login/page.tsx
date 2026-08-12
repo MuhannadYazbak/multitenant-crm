@@ -30,10 +30,16 @@ export default function AdminLoginPage() {
         throw new Error(data.detail || "Authentication failed");
       }
 
-      // Store JWT in localStorage (or document.cookie if preferred)
-      localStorage.setItem("admin_token", data.access_token);
+      // 1. Extract the access token safely
+      const token = data.access_token || data.token;
 
-      // Redirect to Admin Dashboard
+      // 2. Store token in localStorage and cookies for proxy/middleware
+      localStorage.setItem("admin_token", token);
+      document.cookie = `admin_token=${token}; path=/; max-age=86400; SameSite=Lax`;
+      document.cookie = `is_admin=true; path=/; max-age=86400; SameSite=Lax`;
+
+      // 3. Refresh router cache so proxy picks up cookies & redirect
+      router.refresh();
       router.push("/admin/dashboard");
     } catch (err: any) {
       setError(err.message || "An unexpected error occurred");
@@ -104,7 +110,7 @@ export default function AdminLoginPage() {
         </form>
 
         {/* Back to Tenant Login Link */}
-        <div className="mt-6 pt-6 border-t border-slate-700/60 text-center">
+        <div className="flex flex-col items-center justify-center mt-6 pt-6 border-t border-slate-700/60 text-center">
           <Link
             href="/"
             className="inline-flex items-center text-sm text-slate-400 hover:text-slate-200 transition-colors gap-1.5"
@@ -124,14 +130,16 @@ export default function AdminLoginPage() {
             </svg>
             Back to Tenant Login
           </Link>
-        </div>
-        <div className="flex items-center justify-between text-sm">
-          <span className="text-gray-500">Forgot credentials?</span>
           <Link
+
             href="/forgot-password"
+
             className="text-blue-600 dark:text-blue-400 hover:underline font-medium"
+
           >
+
             Forgot Password?
+
           </Link>
         </div>
       </div>

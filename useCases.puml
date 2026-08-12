@@ -1,0 +1,98 @@
+@startuml CRM_Use_Cases
+left to right direction
+
+' --- Visual Styling ---
+skinparam actorStyle outline
+skinparam packageStyle rectangle
+skinparam fontName "Segoe UI", Arial, sans-serif
+skinparam shadowing false
+
+' Colors
+!define COLOR_ADMIN #FEE2E2
+!define COLOR_TENANT #E0F2FE
+!define COLOR_AUTH #FEF3C7
+
+' --- Actors ---
+actor "User" as User
+actor "System Admin" as Admin
+actor "General Tenant" as TenantGen
+actor "Legal Tenant" as TenantLegal
+actor "Insurance Tenant" as TenantIns
+
+' Role Inheritance
+User <|-- Admin
+User <|-- TenantGen
+TenantGen <|-- TenantLegal
+TenantGen <|-- TenantIns
+
+' --- Use Case System Boundary ---
+rectangle "Multi-Tenant Enterprise CRM" {
+
+    ' Authentication Module (All Users)
+    package "Authentication & Recovery" #fffbe2 {
+        usecase "Login to Portal" as UC_Login
+        usecase "Request Password Reset" as UC_ForgotPwd
+        usecase "Reset Password via Token" as UC_ResetPwd
+    }
+
+    ' System Admin Module
+    package "Tenant Management (Admin Console)" #fef2f2 {
+        usecase "Provision New Tenant" as UC_AddTenant
+        usecase "Edit Tenant Configuration" as UC_EditTenant
+        usecase "Freeze / Unfreeze Tenant" as UC_FreezeTenant
+        usecase "Cancel Tenant Subscription" as UC_CancelTenant
+    }
+
+    ' Core Tenant Operations (General)
+    package "Client & Document Core (General Vertical)" #f0f9ff {
+        usecase "Search & Filter Clients" as UC_SearchClients
+        usecase "Create / Edit Client Record" as UC_ManageClients
+        usecase "Manage Client Tabs\n(Notes, Docs, Billing)" as UC_ManageTabs
+        usecase "Soft Delete Tab Items" as UC_SoftDeleteTabs
+    }
+
+    ' Legal Specialization
+    package "Legal Practice Vertical" #f5f3ff {
+        usecase "Relate Tabs & Records to Case" as UC_RelateCase
+        usecase "Manage Case Evidences" as UC_Evidences
+        usecase "Manage Case Witnesses" as UC_Witnesses
+    }
+
+    ' Insurance Specialization
+    package "Insurance Practice Vertical" #ecfdf5 {
+        usecase "Relate Tabs & Records to Policy" as UC_RelatePolicy
+        usecase "Manage Client Vehicles" as UC_Vehicles
+        usecase "Manage Client Properties" as UC_Properties
+    }
+}
+
+' --- Connections ---
+
+' Auth Connections
+User --> UC_Login
+User --> UC_ForgotPwd
+User --> UC_ResetPwd
+
+' Admin Connections
+Admin --> UC_AddTenant
+Admin --> UC_EditTenant
+Admin --> UC_FreezeTenant
+Admin --> UC_CancelTenant
+
+' General Tenant Connections
+TenantGen --> UC_SearchClients
+TenantGen --> UC_ManageClients
+TenantGen --> UC_ManageTabs
+TenantGen --> UC_SoftDeleteTabs
+
+' Legal Tenant Connections (Inherits General)
+TenantLegal --> UC_RelateCase
+TenantLegal --> UC_Evidences
+TenantLegal --> UC_Witnesses
+
+' Insurance Tenant Connections (Inherits General)
+TenantIns --> UC_RelatePolicy
+TenantIns --> UC_Vehicles
+TenantIns --> UC_Properties
+
+@enduml

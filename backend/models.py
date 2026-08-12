@@ -30,7 +30,11 @@ class TenantAccount(Base):
     password_hash = Column(String(255), nullable=False)
     status = Column(String(20), nullable=False, default="active")
     created_at = Column(DateTime(timezone=True), server_default=func.now())
-
+    # Billing fields
+    subscription_status = Column(String(50), default="INACTIVE")  # 'ACTIVE', 'INACTIVE', 'CANCELED'
+    stripe_customer_id = Column(String(255), nullable=True)
+    stripe_subscription_id = Column(String(255), nullable=True)
+    current_period_end = Column(DateTime, nullable=True)       # Expiration / next billing date
 
 # --- TENANT CORE ---
 class Client(Base):

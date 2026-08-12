@@ -9,7 +9,7 @@ from sqlalchemy import text
 from database import SessionLocal, engine, Base, get_db_for_tenant, get_db
 import models
 import schemas  # Clean import from schemas.py
-from routers import insurance, dashboard, legal, admin, tabs_manager, auth
+from routers import insurance, dashboard, legal, admin, tabs_manager, auth, internal
 from sqlalchemy.orm.attributes import flag_modified
 from sqlalchemy import func
 from passlib.context import CryptContext
@@ -23,12 +23,7 @@ app = FastAPI()
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "http://localhost:3000", 
-        "http://127.0.0.1:3000",
-        "http://localhost:8000",
-        "http://127.0.0.1:8000"
-    ],
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -44,6 +39,7 @@ app.include_router(legal.router)
 app.include_router(admin.router)
 app.include_router(tabs_manager.router)
 app.include_router(auth.router)
+app.include_router(internal.router)
 
 # --- API ENDPOINTS ---
 

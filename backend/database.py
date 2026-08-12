@@ -20,9 +20,18 @@ SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 Base = declarative_base()
 
 
+# def get_db() -> Generator[Session, None, None]:
+#     db = SessionLocal()
+#     try:
+#         yield db
+#     finally:
+#         db.close()
+
 def get_db() -> Generator[Session, None, None]:
     db = SessionLocal()
     try:
+        # Reset search_path so pooled connections don't retain old tenant schemas
+        db.execute(text("SET search_path TO public"))
         yield db
     finally:
         db.close()

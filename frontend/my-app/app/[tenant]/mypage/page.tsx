@@ -6,6 +6,7 @@ import { Client } from "../../types/client";
 import { fetchAllClients, createClient, deleteClient } from "@/app/lib/api";
 import Navbar from "@/app/components/Navbar"
 import DashboardStatsWidget from "@/app/components/DashBoardStats";
+import SubsribeButton from "@/app/components/SubsriptionBtn"
 
 
 export default function Home() {
@@ -113,11 +114,15 @@ export default function Home() {
         setFormErrors({});
     }, [client]);
 
+    const STRIPE_PRO_PRICE_ID = 'price_1U3CjSFReYuSySfNQ5U1EQUV';
     return (
         <div className="min-h-screen bg-slate-50">
-            <div className="flex flex-col space-y-3">
-                <Navbar tenantName={tenant} />
-                <DashboardStatsWidget tenant={tenant} />
+            <div className="flex flex-col">
+                <div className="flex flex-col space-y-3">
+                    <Navbar tenantName={tenant} />
+                    <DashboardStatsWidget tenant={tenant} />
+                </div>
+                <SubsribeButton  tenantId={tenant} priceId={STRIPE_PRO_PRICE_ID} subscriptionStatus="" currentPeriodEnd=""/>
             </div>
 
 

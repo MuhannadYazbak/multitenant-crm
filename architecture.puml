@@ -1,0 +1,76 @@
+@startuml Architecture_Diagram
+
+' --- Visual Styling & Parameters ---
+skinparam componentStyle uml2
+skinparam shadowing false
+skinparam packageStyle rectangle
+skinparam fontName "Segoe UI", Arial, sans-serif
+
+' Color Palette
+!define COLOR_FRONTEND #E0F2FE
+!define BORDER_FRONTEND #0284C7
+!define COLOR_BACKEND #DCFCE7
+!define BORDER_BACKEND #16A34A
+!define COLOR_DB #FEF3C7
+!define BORDER_DB #D97706
+!define COLOR_EXTERNAL #F3E8FF
+!define BORDER_EXTERNAL #9333EA
+!define COLOR_CICD #FEE2E2
+!define BORDER_CICD #DC2626
+
+' --- Client Layer ---
+package "Client / UI Layer" #f8fafc {
+    [Next.js Application\n(TypeScript)] as Next COLOR_FRONTEND
+}
+
+' --- Service Layer ---
+package "Backend Microservices Engine" #f8fafc {
+    [Python FastAPI Service\n(REST API Core)] as FastAPI COLOR_BACKEND
+    [SQLAlchemy ORM Layer] as SQLAlchemy COLOR_BACKEND
+}
+
+' --- Data Layer ---
+package "Data Layer" #f8fafc {
+    database "PostgreSQL Database" as Postgres COLOR_DB
+}
+
+' --- External Services ---
+package "External Cloud Services" #f8fafc {
+    [Resend API\n(Transactional Emails)] as Resend COLOR_EXTERNAL
+}
+
+' --- Automation & CI/CD ---
+package "Automation & DevOps Engine" #f8fafc {
+    [GitHub Repository] as GitHub COLOR_CICD
+    [GitHub Actions CI/CD] as GHActions COLOR_CICD
+    [Playwright E2E Suite\n(Page Object Model)] as Playwright COLOR_CICD
+}
+
+' --- Component Styling Adjustments ---
+skinparam component {
+    BackgroundColor<<Frontend>> COLOR_FRONTEND
+    BorderColor<<Frontend>> BORDER_FRONTEND
+    BackgroundColor<<Backend>> COLOR_BACKEND
+    BorderColor<<Backend>> BORDER_BACKEND
+    BackgroundColor<<External>> COLOR_EXTERNAL
+    BorderColor<<External>> BORDER_EXTERNAL
+    BackgroundColor<<CICD>> COLOR_CICD
+    BorderColor<<CICD>> BORDER_CICD
+}
+skinparam database {
+    BackgroundColor COLOR_DB
+    BorderColor BORDER_DB
+}
+
+' --- Data Flow Connections ---
+Next --> FastAPI : HTTP REST Requests
+FastAPI --> SQLAlchemy : Database Operations
+SQLAlchemy --> Postgres : Persistence
+FastAPI --> Resend : Async Email Dispatch
+
+' --- CI/CD Flow Connections ---
+GitHub --> GHActions : Triggers Pipeline
+GHActions --> Playwright : Executes E2E Tests
+Playwright ..> Next : Automated User Journeys
+
+@enduml
