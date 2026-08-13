@@ -55,7 +55,7 @@ jobs:
         working-directory: frontend/my-app
         run: npm ci
 
-      # 4. Cache Playwright Browsers to speed up pipeline runs
+      # 4. Cache Playwright Browsers
       - name: Get Playwright Version
         id: playwright-version
         run: echo "version=$(node -p "require('./frontend/my-app/package.json').devDependencies['@playwright/test']")" >> $GITHUB_OUTPUT
@@ -70,7 +70,7 @@ jobs:
         working-directory: frontend/my-app
         run: npx playwright install --with-deps chromium
 
-       # Initialize DB Schema & Seed Full Test Data
+      # 5. Initialize DB Schema & Seed Full Test Data
       - name: Initialize Database Schema and Seed Data
         working-directory: backend
         env:
@@ -78,24 +78,33 @@ jobs:
           SECRET_KEY: ci_super_secret_test_key_for_hmac_sha256_verification_32bytes
           ADMIN_JWT_SECRET: super_secret_jwt_admin_key_999_32bytes
         run: python seed.py
-        
-        # 5. Execute Playwright E2E Suite
+
+      # 6. Build Next.js Production App BEFORE Playwright
+      - name: Build Next.js Production App
+        working-directory: frontend/my-app
+        env:
+          NEXT_PUBLIC_API_BASE_URL: http://127.0.0.1:8000
+          NEXT_TELEMETRY_DISABLED: 1
+        run: npm run build
+
+      # 7. Execute Playwright E2E Suite
       - name: Run Playwright Tests
         working-directory: frontend/my-app
         env:
           DATABASE_URL: postgresql://postgres:postgrespassword@localhost:5432/saas_mvp_test
-          NEXT_PUBLIC_API_BASE_URL: http://localhost:8000
-          SECRET_KEY: ci_super_secret_test_key_for_hmac_sha256_verification
+          NEXT_PUBLIC_API_BASE_URL: http://127.0.0.1:8000
+          SECRET_KEY: ci_super_secret_test_key_for_hmac_sha256_verification_32bytes
+          ADMIN_JWT_SECRET: super_secret_jwt_admin_key_999_32bytes
           RESEND_API_KEY: ${{secrets.RESEND_API_KEY}}
           NEXT_TELEMETRY_DISABLED: 1
           CI: true
         run: npx playwright test
 
-      # 6. Upload Test Artifacts on Failure
+      # 8. Upload Test Artifacts on Failure
       - name: Upload Playwright Report & Artifacts
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: playwright-report
-          path: test-results/
+          path: frontend/my-app/test-results/
           retention-days: 7
