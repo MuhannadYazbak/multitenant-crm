@@ -12,6 +12,7 @@ export async function proxy(request: NextRequest) {
     pathname.startsWith('/login') ||
     pathname === '/admin/login' ||
     pathname === '/forgot-password' ||
+    pathname.startsWith('/reset-password') ||
     pathname.startsWith('/api/') ||
     pathname.startsWith('/_next') ||
     pathname.includes('.')
