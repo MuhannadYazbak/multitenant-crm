@@ -49,6 +49,20 @@ export class BaseClientPage {
 
     // --- NAVIGATION ---
     async goto(tenant: string, clientName: string) {
+        await this.page.context().addCookies([
+            {
+                name: 'auth_token',
+                value: 'mock_test_token', // or real JWT token from login
+                domain: '127.0.0.1',
+                path: '/',
+            },
+            {
+                name: 'user_tenant',
+                value: tenant, // matches the URL tenant
+                domain: '127.0.0.1',
+                path: '/',
+            },
+        ]);
         await this.page.goto(`/${tenant}/mypage/${encodeURIComponent(clientName)}`);
         await this.page.locator('h1, h2', { hasText: clientName }).waitFor({ state: 'visible', timeout: 10000 });
         await this.page.waitForFunction(
