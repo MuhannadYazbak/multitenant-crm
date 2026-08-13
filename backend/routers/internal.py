@@ -63,3 +63,34 @@ def activate_subscription(
         "stripe_customer_id": cust_id,
         "stripe_subscription_id": sub_id
     }
+
+# backend/routers/internal.py
+
+@router.post("/tenants/{tenant_identifier}/deactivate-subscription")
+def deactivate_subscription(
+    tenant_identifier: str,
+    payload: dict,
+    db: Session = Depends(get_db)
+):
+    # Fetch Tenant
+    tenant = db.query(TenantAccount).filter(
+        (TenantAccount.id == int(tenant_identifier)) if tenant_identifier.isdigit()
+        else (func.lower(TenantAccount.company_name) == tenant_identifier.lower())
+    ).first()
+
+    if not tenant:
+        raise HTTPException(status_code=404, detail=f"Tenant '{tenant_identifier}' not found")
+
+    # Mark subscription as PAST_DUE or INACTIVE
+    status_to_set = payload.get("status", "PAST_DUE")
+
+    db.query(TenantAccount).filter(TenantAccount.id == tenant.id).update(
+        {
+            TenantAccount.subscription_status: status_to_set,
+        },
+        synchronize_session="fetch"
+    )
+
+    db.commit()
+
+    return {"status": "success", "tenant_id": tenant.id, "subscription_status": status_to_set}
