@@ -1,0 +1,15 @@
+.venv
+__pycache__
+*.pyc
+*.pyo
+*.pyd
+.env
+.git
+.gitignore
+
+# Temporary migration & fix scripts
+new*.py
+fix_*.py
+
+# Local persistent uploads/storage
+uploaded_documents/

@@ -4,15 +4,21 @@ from sqlalchemy.orm import sessionmaker, declarative_base, Session
 from fastapi import Header, HTTPException
 from typing import Generator
 from dotenv import load_dotenv
-import logging
+from pathlib import Path
 
-# Load variables from .env
-load_dotenv()
+env_path = Path(__file__).resolve().parent / ".env"
+load_dotenv(dotenv_path=env_path, override=True)
 
-DATABASE_URL = os.getenv(
-    "DATABASE_URL", 
-    "postgresql://postgres:My%40postgre@localhost:5432/saas_mvp"
-)
+# DATABASE_URL = os.getenv(
+#     "DATABASE_URL", 
+#     "postgresql://postgres:My%40postgre@localhost:5432/saas_mvp"
+# )
+DATABASE_URL = os.getenv("DATABASE_URL")
+if not DATABASE_URL:
+    raise ValueError("DATABASE_URL is not set in .env file!")
+
+# Debug print (you can remove this after testing)
+print(f"Connecting to database host: {DATABASE_URL.split('@')[-1] if '@' in DATABASE_URL else 'LOCAL'}")
 SECRET_KEY = os.getenv("SECRET_KEY", "default_fallback_key_32_characters_min")
 
 engine = create_engine(DATABASE_URL, pool_size=10, max_overflow=20)
