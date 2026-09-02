@@ -9,7 +9,7 @@ import { EvidenceData, EvidenceResponse } from "../types/evidence";
 import { WitnessData, WitnessResponse } from "../types/witness";
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
-const STRIPE_SERVICE_URL = process.env.NEXT_PUBLIC_STRIPE_SERVICE_URL || "https://your-stripe-service.onrender.com";
+const STRIPE_SERVICE_URL = process.env.NEXT_PUBLIC_STRIPE_SERVICE_URL || "https://paymentsmicroservice.onrender.com";
 export const fetchDashboardData = async (tenantName: string) => {
   const response = await fetch(`${API_BASE_URL}/api/dashboard/clients`, {
     method: "GET",
