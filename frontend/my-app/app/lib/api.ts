@@ -9,6 +9,7 @@ import { EvidenceData, EvidenceResponse } from "../types/evidence";
 import { WitnessData, WitnessResponse } from "../types/witness";
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+const STRIPE_SERVICE_URL = process.env.NEXT_PUBLIC_STRIPE_SERVICE_URL || "https://your-stripe-service.onrender.com";
 export const fetchDashboardData = async (tenantName: string) => {
   const response = await fetch(`${API_BASE_URL}/api/dashboard/clients`, {
     method: "GET",
@@ -910,7 +911,7 @@ export async function deleteWitness(
 async function handleSubscribe(tenantId: string, priceId: string) {
   priceId = ''
   try {
-    const response = await fetch(`${API_BASE_URL}/api/v1/subscriptions/create-checkout-session`, {
+    const response = await fetch(`${STRIPE_SERVICE_URL}/api/v1/subscriptions/create-checkout-session`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
