@@ -27,7 +27,7 @@ export default function AdminDashboardPage() {
   const [tenantType, setTenantType] = useState<"general" | "insurance" | "legal">("general");
   const [provisioning, setProvisioning] = useState(false);
   const [modalError, setModalError] = useState<string | null>(null);
-
+  const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
   const fetchTenants = async () => {
     const token = localStorage.getItem("admin_token");
     if (!token) {
@@ -36,7 +36,7 @@ export default function AdminDashboardPage() {
     }
 
     try {
-      const res = await fetch("http://localhost:8000/api/admin/tenants", {
+      const res = await fetch(`${API_BASE_URL}/api/admin/tenants`, {
         headers: {
           Authorization: `Bearer ${token}`,
         },
@@ -70,7 +70,7 @@ export default function AdminDashboardPage() {
     setActionLoading(companyName);
     try {
       const res = await fetch(
-        `http://localhost:8000/api/admin/tenants/${companyName}/status`,
+        `${API_BASE_URL}/api/admin/tenants/${companyName}/status`,
         {
           method: "PATCH",
           headers: {
@@ -100,7 +100,7 @@ export default function AdminDashboardPage() {
     setModalError(null);
 
     try {
-      const res = await fetch("http://localhost:8000/api/admin/tenants", {
+      const res = await fetch(`${API_BASE_URL}/api/admin/tenants`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
