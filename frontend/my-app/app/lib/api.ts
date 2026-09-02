@@ -8,9 +8,9 @@ import  { PropertyData, PropertyResponse} from "@/app/types/property";
 import { EvidenceData, EvidenceResponse } from "../types/evidence";
 import { WitnessData, WitnessResponse } from "../types/witness";
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8000";
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 export const fetchDashboardData = async (tenantName: string) => {
-  const response = await fetch("http://127.0.0.1:8000/api/dashboard/clients", {
+  const response = await fetch(`${API_BASE_URL}/api/dashboard/clients`, {
     method: "GET",
     headers: {
       "Content-Type": "application/json",
@@ -910,7 +910,7 @@ export async function deleteWitness(
 async function handleSubscribe(tenantId: string, priceId: string) {
   priceId = ''
   try {
-    const response = await fetch('http://localhost:8001/api/v1/subscriptions/create-checkout-session', {
+    const response = await fetch(`${API_BASE_URL}/api/v1/subscriptions/create-checkout-session`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
