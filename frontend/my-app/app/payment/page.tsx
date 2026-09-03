@@ -5,13 +5,13 @@ import React, { useState } from 'react';
 export default function SubscriptionTest  ()  {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-
+  const STRIPE_SERVICE_URL = process.env.NEXT_PUBLIC_STRIPE_SERVICE_URL || "https://paymentsmicroservice.onrender.com";
   const handleSubscribe = async () => {
     setLoading(true);
     setError(null);
 
     try {
-      const response = await fetch('http://localhost:8001/api/v1/subscriptions/create-checkout-session', {
+      const response = await fetch(`${STRIPE_SERVICE_URL}/api/v1/subscriptions/create-checkout-session`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

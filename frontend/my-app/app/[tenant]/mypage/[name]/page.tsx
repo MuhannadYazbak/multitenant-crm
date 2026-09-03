@@ -37,7 +37,7 @@ export default function ClientDetailPage() {
     const rawClientName = params?.name as string;
     const clientName = rawClientName ? decodeURIComponent(rawClientName) : "";
     const tenant = params?.tenant as string;
-
+    const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
     const [client, setClient] = useState<Client | null>(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
@@ -89,7 +89,7 @@ export default function ClientDetailPage() {
                 // Detect Tenant Type
                 let currentTenantType = initialTenantType;
                 try {
-                    const res = await fetch(`http://localhost:8000/api/tenants/${tenant}`);
+                    const res = await fetch(`${API_BASE_URL}/api/tenants/${tenant}`);
                     if (res.ok) {
                         const tenantData = await res.json();
                         if (tenantData?.tenant_type) currentTenantType = tenantData.tenant_type;
@@ -145,7 +145,7 @@ export default function ClientDetailPage() {
         setSaving(true);
 
         try {
-            const response = await fetch(`http://localhost:8000/api/clients/${client?.id}`, {
+            const response = await fetch(`${API_BASE_URL}/api/clients/${client?.id}`, {
                 method: "PUT",
                 headers: {
                     "Content-Type": "application/json",
