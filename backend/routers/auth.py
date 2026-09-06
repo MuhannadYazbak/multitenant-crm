@@ -1,11 +1,20 @@
 import os
 import resend
+from typing import List, Set
 from fastapi import APIRouter, HTTPException, status, Depends
 from sqlalchemy.orm import Session
-from pydantic import BaseModel
+from pydantic import BaseModel, EmailStr
 
 from database import get_db, find_account_by_identifier, update_account_password
-from auth_utils import hash_password, create_password_reset_token, verify_password_reset_token
+from auth_utils import (
+    hash_password,
+    verify_password,
+    create_user_access_token,
+    create_password_reset_token,
+    verify_password_reset_token,
+    get_current_user
+)
+from models import User, UserRole, Role
 
 router = APIRouter(prefix="/auth", tags=["Auth & Security"])
 
@@ -21,6 +30,31 @@ if RESEND_API_KEY:
     resend.api_key = RESEND_API_KEY
 
 
+# --- Schemas ---
+
+class LoginPayload(BaseModel):
+    email: EmailStr
+    password: str
+
+
+class RoleResponse(BaseModel):
+    id: int
+    name: str
+
+    class Config:
+        from_attributes = True
+
+
+class UserMeResponse(BaseModel):
+    id: int
+    email: str
+    roles: List[RoleResponse]
+    permissions: List[str]
+
+    class Config:
+        from_attributes = True
+
+
 class ForgotPasswordPayload(BaseModel):
     identifier: str  # Admin username OR tenant company_name
 
@@ -28,6 +62,63 @@ class ForgotPasswordPayload(BaseModel):
 class ResetPasswordPayload(BaseModel):
     token: str
     new_password: str
+
+
+# --- Helper Function for Permission Extraction ---
+
+def get_user_permissions(db: Session, user_id: int) -> tuple[List[Role], List[str]]:
+    """Fetches assigned roles and flattens unique permissions for a given user."""
+    user_roles = (
+        db.query(Role)
+        .join(UserRole, Role.id == UserRole.role_id)
+        .filter(UserRole.user_id == user_id)
+        .all()
+    )
+
+    permissions: Set[str] = set()
+    for role in user_roles:
+        if role.permissions:
+            permissions.update(role.permissions)
+
+    return user_roles, list(permissions)
+
+
+# --- Endpoints ---
+
+@router.post("/login")
+def login(payload: LoginPayload, db: Session = Depends(get_db)):
+    """Authenticates user credentials and returns JWT token along with permissions."""
+    user = db.query(User).filter(User.email == payload.email).first()
+    if not user or not verify_password(payload.password, user.password_hash):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid email or password"
+        )
+
+    _, permissions = get_user_permissions(db, user.id)
+    token = create_user_access_token(data={"sub": str(user.id), "email": user.email})
+
+    return {
+        "access_token": token,
+        "token_type": "bearer",
+        "permissions": permissions
+    }
+
+
+@router.get("/me", response_model=UserMeResponse)
+def get_current_user_profile(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Returns profile information for the authenticated user including assigned roles and permissions."""
+    roles, permissions = get_user_permissions(db, current_user.id)
+    
+    return {
+        "id": current_user.id,
+        "email": current_user.email,
+        "roles": roles,
+        "permissions": permissions
+    }
 
 
 def send_password_reset_email(to_email: str, reset_url: str):
@@ -87,7 +178,6 @@ def request_password_reset(payload: ForgotPasswordPayload, db: Session = Depends
     target_email = account.get("email") or NOTIFICATION_EMAIL
     send_password_reset_email(target_email, reset_url)
 
-    # Attach reset details in Dev/Test environments for E2E interception
     if IS_DEV_OR_TEST:
         return {
             **generic_response,

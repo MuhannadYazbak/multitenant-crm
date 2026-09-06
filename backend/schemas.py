@@ -321,3 +321,49 @@ CaseDocumentCreate = DocumentCreate
 CaseDocumentResponse = DocumentResponse
 CaseBillingCreate = BillingEntryCreate
 CaseBillingResponse = BillingEntryResponse
+
+# ==========================================
+# 8. RBAC & AUDIT LOG SCHEMAS
+# ==========================================
+
+class UserBase(BaseModel):
+    email: EmailStr
+    full_name: str
+    is_active: Optional[bool] = True
+
+class UserCreate(UserBase):
+    password: str
+    role_ids: List[int] = []
+
+class UserResponse(UserBase):
+    id: int
+    tenant_id: int
+    created_at: datetime
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class RoleBase(BaseModel):
+    name: str
+    permissions: List[str]
+
+class RoleCreate(RoleBase):
+    pass
+
+class RoleResponse(RoleBase):
+    id: int
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class AuditLogResponse(BaseModel):
+    id: int
+    user_id: Optional[int] = None
+    user_email: Optional[str] = None
+    action: str
+    resource: str
+    details: Dict[str, Any]
+    ip_address: Optional[str] = None
+    created_at: datetime
+
+    model_config = ConfigDict(from_attributes=True)

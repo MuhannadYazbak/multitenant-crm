@@ -224,3 +224,52 @@ class Witness(Base):
 
     # Relationship back to Client
     client = relationship("Client", back_populates="witnesses")
+    
+    # --- BACKEND / RBAC & AUDIT MODELS ---
+
+class User(Base):
+    __tablename__ = "users"
+
+    id = Column(Integer, primary_key=True, index=True)
+    tenant_id = Column(Integer, ForeignKey("public.tenant_accounts.id", ondelete="CASCADE"), nullable=False, index=True)
+    email = Column(String(100), nullable=False, index=True)
+    password_hash = Column(String(255), nullable=False)
+    full_name = Column(String(100), nullable=False)
+    is_active = Column(Boolean, default=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+    user_roles = relationship("UserRole", back_populates="user", cascade="all, delete-orphan")
+
+
+class Role(Base):
+    __tablename__ = "roles"
+
+    id = Column(Integer, primary_key=True, index=True)
+    name = Column(String(50), nullable=False)  # e.g., "Admin", "Manager", "Viewer"
+    permissions = Column(JSONB, nullable=False, default=[])  # e.g., ["clients:read", "clients:write"]
+
+    user_roles = relationship("UserRole", back_populates="role", cascade="all, delete-orphan")
+
+
+class UserRole(Base):
+    __tablename__ = "user_roles"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    role_id = Column(Integer, ForeignKey("roles.id", ondelete="CASCADE"), nullable=False)
+
+    user = relationship("User", back_populates="user_roles")
+    role = relationship("Role", back_populates="user_roles")
+
+
+class AuditLog(Base):
+    __tablename__ = "audit_logs"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    user_email = Column(String(100), nullable=True)
+    action = Column(String(100), nullable=False)    # e.g., "CREATE_CLIENT", "DELETE_POLICY"
+    resource = Column(String(50), nullable=False)     # e.g., "clients", "billing"
+    details = Column(JSONB, default={}, nullable=False)
+    ip_address = Column(String(45), nullable=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())

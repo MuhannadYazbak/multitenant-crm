@@ -1,14 +1,25 @@
-from fastapi import APIRouter, Depends, HTTPException
+# backend/routers/dashboard.py
+from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 from database import get_db_for_tenant
 import models
+from models import User
+from auth_utils import get_current_user
+from rbac import require_permission
 
 router = APIRouter(prefix="/api/dashboard", tags=["Dashboard Metrics"])
 
 
 @router.get("/stats")
-def get_dashboard_stats(db: Session = Depends(get_db_for_tenant)):
+def get_dashboard_stats(
+    db: Session = Depends(get_db_for_tenant),
+    current_user: User = Depends(require_permission("dashboard:read"))
+):
+    """
+    Returns high-level metric summaries tailored to the tenant vertical.
+    Requires 'dashboard:read' permission.
+    """
     tenant_type = db.info.get("tenant_type", "general")
 
     # Base metrics for all tenants
@@ -45,7 +56,6 @@ def get_dashboard_stats(db: Session = Depends(get_db_for_tenant)):
             db.query(func.count(models.LegalCase.id)).scalar() or 0
         )
 
-        # Uses func.lower to match 'Open', 'open', 'In Progress', 'Pending'
         open_cases = (
             db.query(func.count(models.LegalCase.id))
             .filter(
@@ -58,8 +68,8 @@ def get_dashboard_stats(db: Session = Depends(get_db_for_tenant)):
         )
 
         stats["vertical_stats"] = {
-            "total_cases": total_cases,  # Read by stats.vertical_stats?.total_cases
-            "open_cases": open_cases,  # Read by stats.vertical_stats?.open_cases
+            "total_cases": total_cases,
+            "open_cases": open_cases,
         }
 
     return stats
