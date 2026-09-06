@@ -7,40 +7,61 @@ import Link from "next/link";
 
 export default function AdminLoginPage() {
   const router = useRouter();
-  const [username, setUsername] = useState("");
+  const [usernameInput, setUsernameInput] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
     setLoading(true);
 
     try {
+      const cleanInput = usernameInput.trim();
+      
+      // Extract username prefix if user typed an email address (e.g., admin@example.com -> admin)
+      const sanitizedUsername = cleanInput.includes("@")
+        ? cleanInput.split("@")[0]
+        : cleanInput;
+
       const response = await fetch(`${API_BASE_URL}/api/admin/login`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ username, password }),
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          username: sanitizedUsername,
+          password: password.trim(),
+        }),
       });
 
       const data = await response.json();
 
       if (!response.ok) {
-        throw new Error(data.detail || "Authentication failed");
+        const message =
+          typeof data.detail === "object"
+            ? JSON.stringify(data.detail)
+            : data.detail;
+        throw new Error(message || "Authentication failed");
       }
 
-      // 1. Extract the access token safely
+      // Extract access token
       const token = data.access_token || data.token;
 
-      // 2. Store token in localStorage and cookies for proxy/middleware
-      localStorage.setItem("admin_token", token);
-      document.cookie = `admin_token=${token}; path=/; max-age=86400; SameSite=Lax`;
-      document.cookie = `is_admin=true; path=/; max-age=86400; SameSite=Lax`;
+      if (token) {
+        localStorage.setItem("access_token", token);
+        localStorage.setItem("admin_token", token);
 
-      // 3. Refresh router cache so proxy picks up cookies & redirect
-      router.refresh();
-      router.push("/admin/dashboard");
+        document.cookie = `admin_token=${token}; path=/; max-age=86400; SameSite=Lax`;
+        document.cookie = `is_admin=true; path=/; max-age=86400; SameSite=Lax`;
+
+        router.refresh();
+        router.push("/admin/dashboard");
+      } else {
+        throw new Error("Invalid response from server. Missing access token.");
+      }
     } catch (err: any) {
       setError(err.message || "An unexpected error occurred");
     } finally {
@@ -65,7 +86,7 @@ export default function AdminLoginPage() {
 
         {/* Error Alert */}
         {error && (
-          <div className="mb-4 p-3 bg-red-500/10 border border-red-500/30 text-red-400 text-sm rounded-lg">
+          <div className="mb-4 p-3 bg-red-500/10 border border-red-500/30 text-red-400 text-sm rounded-lg break-words text-xs">
             {error}
           </div>
         )}
@@ -74,14 +95,14 @@ export default function AdminLoginPage() {
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
             <label className="block text-xs font-medium text-slate-300 uppercase tracking-wider mb-1">
-              Admin Username
+              Admin Username / Email
             </label>
             <input
               type="text"
               required
-              value={username}
-              onChange={(e) => setUsername(e.target.value)}
-              placeholder="e.g. admin"
+              value={usernameInput}
+              onChange={(e) => setUsernameInput(e.target.value)}
+              placeholder="e.g. admin or admin@example.com"
               className="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500"
             />
           </div>
@@ -109,8 +130,8 @@ export default function AdminLoginPage() {
           </button>
         </form>
 
-        {/* Back to Tenant Login Link */}
-        <div className="flex flex-col items-center justify-center mt-6 pt-6 border-t border-slate-700/60 text-center">
+        {/* Links */}
+        <div className="flex flex-col items-center justify-center gap-2 mt-6 pt-6 border-t border-slate-700/60 text-center">
           <Link
             href="/"
             className="inline-flex items-center text-sm text-slate-400 hover:text-slate-200 transition-colors gap-1.5"
@@ -131,15 +152,10 @@ export default function AdminLoginPage() {
             Back to Tenant Login
           </Link>
           <Link
-
             href="/forgot-password"
-
-            className="text-blue-600 dark:text-blue-400 hover:underline font-medium"
-
+            className="text-xs text-blue-400 hover:underline font-medium"
           >
-
             Forgot Password?
-
           </Link>
         </div>
       </div>

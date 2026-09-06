@@ -1,7 +1,7 @@
 "use client";
 
-import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { useState, useEffect } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { loginTenant } from "@/app/lib/api";
 import Link from "next/link";
 
@@ -10,7 +10,16 @@ export default function LoginPage() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  
   const router = useRouter();
+  const searchParams = useSearchParams();
+
+  // Display notice if redirected from expired session (triggered by apiFetch 401)
+  useEffect(() => {
+    if (searchParams.get("expired") === "true") {
+      setError("Your session has expired. Please log in again.");
+    }
+  }, [searchParams]);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -27,16 +36,27 @@ export default function LoginPage() {
       const data = await loginTenant(companyInput.trim(), password);
 
       // 1. Extract token & tenant slug from API response
-      const token = data.access_token || data.token || data.auth_token || "authenticated";
+      const token = data.access_token || data.token || data.auth_token;
       const tenantSlug = data.tenant || data.tenant_slug || companyInput.trim().toLowerCase();
 
-      // 2. ✅ SET COOKIES FOR PROXY / MIDDLEWARE WITH path=/
-      document.cookie = `auth_token=${token}; path=/; max-age=86400; SameSite=Lax`;
-      document.cookie = `user_tenant=${tenantSlug}; path=/; max-age=86400; SameSite=Lax`;
+      if (token) {
+        // 2. Store token & metadata in localStorage for apiFetch
+        localStorage.setItem("access_token", token);
+        localStorage.setItem("tenant_name", tenantSlug);
+        if (data.user) {
+          localStorage.setItem("user_data", JSON.stringify(data.user));
+        }
 
-      // 3. Navigate to tenant workspace
-      router.push(`/${tenantSlug}/mypage`);
-      router.refresh(); // Refresh router cache to ensure proxy picks up new cookies
+        // 3. Set cookies for server middleware / proxies
+        document.cookie = `auth_token=${token}; path=/; max-age=86400; SameSite=Lax`;
+        document.cookie = `user_tenant=${tenantSlug}; path=/; max-age=86400; SameSite=Lax`;
+
+        // 4. Navigate to tenant workspace
+        router.push(`/${tenantSlug}/mypage`);
+        router.refresh();
+      } else {
+        setError("Invalid response from server. Missing access token.");
+      }
     } catch (err: any) {
       setError(err.message || "Invalid credentials. Please try again.");
     } finally {
