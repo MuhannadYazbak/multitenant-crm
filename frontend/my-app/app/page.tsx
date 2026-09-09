@@ -2,11 +2,26 @@
 
 import { useState, useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { loginTenant } from "@/app/lib/api";
+import { apiFetch } from "@/app/lib/api";
 import Link from "next/link";
 
+interface UserAuthResponse {
+  access_token: string;
+  token_type: string;
+  user: {
+    id: number;
+    tenant_id: number;
+    company_name: string;
+    tenant_type: string;
+    email: string;
+    full_name: string;
+    roles: Array<{ id: number; name: string; permissions: string[] }>;
+    permissions: string[];
+  };
+}
+
 export default function LoginPage() {
-  const [companyInput, setCompanyInput] = useState("");
+  const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
@@ -14,7 +29,7 @@ export default function LoginPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
 
-  // Display notice if redirected from expired session (triggered by apiFetch 401)
+  // Display notice if redirected from expired session
   useEffect(() => {
     if (searchParams.get("expired") === "true") {
       setError("Your session has expired. Please log in again.");
@@ -25,7 +40,7 @@ export default function LoginPage() {
     e.preventDefault();
     setError("");
 
-    if (!companyInput.trim() || !password.trim()) {
+    if (!email.trim() || !password.trim()) {
       setError("Please fill out all fields.");
       return;
     }
@@ -33,29 +48,37 @@ export default function LoginPage() {
     setLoading(true);
 
     try {
-      const data = await loginTenant(companyInput.trim(), password);
+      // Hit unified user authentication router
+      const data = await apiFetch<UserAuthResponse>("/auth/login", {
+        method: "POST",
+        body: JSON.stringify({
+          email: email.trim(),
+          password: password.trim(),
+        }),
+      });
 
-      // 1. Extract token & tenant slug from API response
-      const token = data.access_token || data.token || data.auth_token;
-      const tenantSlug = data.tenant || data.tenant_slug || companyInput.trim().toLowerCase();
+      const token = data?.access_token;
+      const tenantSlug = data?.user?.company_name;
 
-      if (token) {
-        // 2. Store token & metadata in localStorage for apiFetch
+      if (token && tenantSlug) {
+        const userRoles = data.user.roles || [];
+        const primaryRole = userRoles[0]?.name || "User";
+
+        // 1. Store auth info in localStorage for apiFetch calls
         localStorage.setItem("access_token", token);
-        localStorage.setItem("tenant_name", tenantSlug);
-        if (data.user) {
-          localStorage.setItem("user_data", JSON.stringify(data.user));
-        }
+        localStorage.setItem("tenant_slug", tenantSlug);
+        localStorage.setItem("user_data", JSON.stringify(data.user));
 
-        // 3. Set cookies for server middleware / proxies
+        // 2. Set cookies for middleware and client proxy routing
         document.cookie = `auth_token=${token}; path=/; max-age=86400; SameSite=Lax`;
-        document.cookie = `user_tenant=${tenantSlug}; path=/; max-age=86400; SameSite=Lax`;
+        document.cookie = `tenant_slug=${tenantSlug}; path=/; max-age=86400; SameSite=Lax`;
+        document.cookie = `user_role=${primaryRole}; path=/; max-age=86400; SameSite=Lax`;
 
-        // 4. Navigate to tenant workspace
+        // 3. Redirect to workspace page
         router.push(`/${tenantSlug}/mypage`);
         router.refresh();
       } else {
-        setError("Invalid response from server. Missing access token.");
+        setError("Invalid response from server. Missing user credentials or tenant details.");
       }
     } catch (err: any) {
       setError(err.message || "Invalid credentials. Please try again.");
@@ -68,20 +91,20 @@ export default function LoginPage() {
     <div className="flex justify-center items-center min-h-screen bg-slate-50 font-sans">
       <div className="p-8 bg-white border border-slate-200 rounded-lg w-[350px] shadow-md">
         <h2 className="text-xl font-bold text-center mb-6 text-slate-800">
-          Company Workspace Login
+          User Workspace Login
         </h2>
 
         <form onSubmit={handleLogin} className="flex flex-col gap-4">
           <div>
             <label className="block mb-1 text-sm text-slate-600 font-medium">
-              Company Domain
+              Email Address
             </label>
             <input
               suppressHydrationWarning
-              type="text"
-              value={companyInput}
-              onChange={(e) => setCompanyInput(e.target.value)}
-              placeholder="e.g. company-a"
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              placeholder="user@company.com"
               className="w-full p-2 border border-slate-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
             />
           </div>
@@ -112,7 +135,7 @@ export default function LoginPage() {
                 : "bg-blue-600 hover:bg-blue-700"
             }`}
           >
-            {loading ? "Verifying..." : "Login to Workspace"}
+            {loading ? "Verifying..." : "Sign In"}
           </button>
         </form>
 
@@ -129,9 +152,9 @@ export default function LoginPage() {
           <span className="text-gray-500">Forgot credentials?</span>
           <Link
             href="/forgot-password"
-            className="text-blue-600 dark:text-blue-400 hover:underline font-medium"
+            className="text-blue-600 dark:text-blue-400 hover:underline font-medium text-xs"
           >
-            Forgot Password?
+            Reset Password
           </Link>
         </div>
       </div>

@@ -48,21 +48,56 @@ class AssignRolePayload(BaseModel):
 
 @router.post("/login", response_model=AdminToken)
 def admin_login(payload: AdminLogin, db: Session = Depends(get_db)):
-    admin = db.query(Admin).filter(Admin.username == payload.username).first()
-    if not admin or not verify_password(payload.password, admin.password_hash):
+    # 1. Fetch user from public.users table
+    user = db.query(User).filter(User.email == payload.username).first()
+    if not user or not verify_password(payload.password, user.password_hash):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Incorrect admin username or password"
         )
-    
-    access_token = create_admin_access_token(data={"sub": admin.username})
-    return {"access_token": access_token, "token_type": "bearer"}
+
+    # 2. Extract user roles via user_roles mapping
+    user_roles = [
+        {
+            "id": ur.role.id,
+            "name": ur.role.name,
+            "permissions": ur.role.permissions
+        }
+        for ur in user.user_roles if ur.role
+    ]
+
+    # 3. Case-insensitive RBAC verification
+    allowed_roles = {"super_admin", "admin"}
+    role_names_lower = {r["name"].lower() for r in user_roles}
+
+    if not allowed_roles.intersection(role_names_lower):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Access denied: Account lacks administrative privileges"
+        )
+
+    # 4. Generate JWT
+    access_token = create_admin_access_token(data={"sub": user.email})
+
+    # 5. Return dict structured to match AdminToken schema
+    return {
+        "access_token": access_token,
+        "token_type": "bearer",
+        "user": {
+            "id": user.id,
+            "tenant_id": user.tenant_id,
+            "email": user.email,
+            "full_name": user.full_name,
+            "is_active": user.is_active,
+            "roles": user_roles
+        }
+    }
 
 
 @router.post("/seed-initial-admin", status_code=201)
 def seed_initial_admin(payload: AdminLogin, db: Session = Depends(get_db)):
     """Helper route to create the first admin user if none exists."""
-    existing = db.query(Admin).filter(Admin.username == payload.username).first()
+    existing = db.query(Admin).filter(User.username == payload.username).first()
     if existing:
         raise HTTPException(status_code=400, detail="Admin user already exists.")
     

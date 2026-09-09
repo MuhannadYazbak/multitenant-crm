@@ -25,3 +25,21 @@ export interface AuthContextType {
   hasPermission: (permission: string) => boolean;
   hasAnyPermission: (permissions: string[]) => boolean;
 }
+
+export interface AuthResponse {
+  access_token: string;
+  token_type: string;
+  user: User;
+}
+
+export interface AuditLog {
+  id: string;
+  user_id: string;
+  user_email: string;
+  tenant_id?: string;
+  action: string;
+  resource: string;
+  details?: Record<string, any>;
+  ip_address?: string;
+  created_at: string;
+}

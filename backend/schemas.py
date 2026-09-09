@@ -40,9 +40,23 @@ class AdminLogin(BaseModel):
     username: str
     password: str
 
+class RoleInfo(BaseModel):
+    id: int
+    name: str
+    permissions: List[Any]
+
+class AdminUserResponse(BaseModel):
+    id: int
+    tenant_id: int
+    email: str
+    full_name: str
+    is_active: bool
+    roles: List[RoleInfo]
+
 class AdminToken(BaseModel):
     access_token: str
-    token_type: str = "bearer"
+    token_type: str
+    user: Optional[AdminUserResponse] = None
 
 
 # ==========================================

@@ -1,6 +1,6 @@
 import os
 import resend
-from typing import List, Set
+from typing import List, Set, Any, Optional
 from fastapi import APIRouter, HTTPException, status, Depends
 from sqlalchemy.orm import Session
 from pydantic import BaseModel, EmailStr
@@ -14,7 +14,7 @@ from auth_utils import (
     verify_password_reset_token,
     get_current_user
 )
-from models import User, UserRole, Role
+from models import User, UserRole, Role, TenantAccount
 
 router = APIRouter(prefix="/auth", tags=["Auth & Security"])
 
@@ -37,22 +37,31 @@ class LoginPayload(BaseModel):
     password: str
 
 
-class RoleResponse(BaseModel):
+class RoleInfo(BaseModel):
     id: int
     name: str
+    permissions: List[Any]
 
     class Config:
         from_attributes = True
 
 
-class UserMeResponse(BaseModel):
+class TenantUserInfo(BaseModel):
     id: int
+    tenant_id: int
+    company_name: str
+    tenant_type: str
     email: str
-    roles: List[RoleResponse]
+    full_name: str
+    is_active: bool
+    roles: List[RoleInfo]
     permissions: List[str]
 
-    class Config:
-        from_attributes = True
+
+class UserAuthToken(BaseModel):
+    access_token: str
+    token_type: str
+    user: TenantUserInfo
 
 
 class ForgotPasswordPayload(BaseModel):
@@ -66,28 +75,30 @@ class ResetPasswordPayload(BaseModel):
 
 # --- Helper Function for Permission Extraction ---
 
-def get_user_permissions(db: Session, user_id: int) -> tuple[List[Role], List[str]]:
-    """Fetches assigned roles and flattens unique permissions for a given user."""
-    user_roles = (
-        db.query(Role)
-        .join(UserRole, Role.id == UserRole.role_id)
-        .filter(UserRole.user_id == user_id)
-        .all()
-    )
-
+def get_user_roles_and_permissions(user: User) -> tuple[List[dict], List[str]]:
+    """Extracts role dictionaries and flattens unique permission strings."""
+    extracted_roles = []
     permissions: Set[str] = set()
-    for role in user_roles:
-        if role.permissions:
-            permissions.update(role.permissions)
 
-    return user_roles, list(permissions)
+    for ur in user.user_roles:
+        if ur.role:
+            extracted_roles.append({
+                "id": ur.role.id,
+                "name": ur.role.name,
+                "permissions": ur.role.permissions or []
+            })
+            if ur.role.permissions:
+                permissions.update(ur.role.permissions)
+
+    return extracted_roles, list(permissions)
 
 
 # --- Endpoints ---
 
-@router.post("/login")
+@router.post("/login", response_model=UserAuthToken)
 def login(payload: LoginPayload, db: Session = Depends(get_db)):
-    """Authenticates user credentials and returns JWT token along with permissions."""
+    """Authenticates tenant user credentials and returns JWT token with tenant & user metadata."""
+    # 1. Fetch user by email
     user = db.query(User).filter(User.email == payload.email).first()
     if not user or not verify_password(payload.password, user.password_hash):
         raise HTTPException(
@@ -95,27 +106,68 @@ def login(payload: LoginPayload, db: Session = Depends(get_db)):
             detail="Invalid email or password"
         )
 
-    _, permissions = get_user_permissions(db, user.id)
-    token = create_user_access_token(data={"sub": str(user.id), "email": user.email})
+    if not user.is_active:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="User account is deactivated"
+        )
+
+    # 2. Fetch associated tenant account
+    tenant = db.query(TenantAccount).filter(TenantAccount.id == user.tenant_id).first()
+    if not tenant or tenant.status != "active":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Tenant workspace is inactive or suspended"
+        )
+
+    # 3. Process roles and permissions
+    roles, permissions = get_user_roles_and_permissions(user)
+
+    # 4. Generate token with tenant context
+    token = create_user_access_token(data={
+        "sub": str(user.id),
+        "email": user.email,
+        "tenant_id": user.tenant_id,
+        "company_name": tenant.company_name
+    })
 
     return {
         "access_token": token,
         "token_type": "bearer",
-        "permissions": permissions
+        "user": {
+            "id": user.id,
+            "tenant_id": user.tenant_id,
+            "company_name": tenant.company_name,
+            "tenant_type": tenant.tenant_type,
+            "email": user.email,
+            "full_name": user.full_name,
+            "is_active": user.is_active,
+            "roles": roles,
+            "permissions": permissions
+        }
     }
 
 
-@router.get("/me", response_model=UserMeResponse)
+@router.get("/me", response_model=TenantUserInfo)
 def get_current_user_profile(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """Returns profile information for the authenticated user including assigned roles and permissions."""
-    roles, permissions = get_user_permissions(db, current_user.id)
-    
+    """Returns profile information for the authenticated user including tenant, assigned roles, and permissions."""
+    tenant = db.query(TenantAccount).filter(TenantAccount.id == current_user.tenant_id).first()
+    if not tenant:
+        raise HTTPException(status_code=404, detail="Tenant account not found")
+
+    roles, permissions = get_user_roles_and_permissions(current_user)
+
     return {
         "id": current_user.id,
+        "tenant_id": current_user.tenant_id,
+        "company_name": tenant.company_name,
+        "tenant_type": tenant.tenant_type,
         "email": current_user.email,
+        "full_name": current_user.full_name,
+        "is_active": current_user.is_active,
         "roles": roles,
         "permissions": permissions
     }

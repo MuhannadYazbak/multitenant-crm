@@ -14,7 +14,7 @@ const STRIPE_SERVICE_URL = process.env.NEXT_PUBLIC_STRIPE_SERVICE_URL || "https:
 /**
  * Universal fetch wrapper injecting Bearer token, tenant header, and handling 401/403 responses.
  */
-async function apiFetch<T = any>(
+export async function apiFetch<T = any>(
   endpoint: string,
   options: RequestInit = {},
   tenant?: string
