@@ -376,7 +376,7 @@ class AuditLogResponse(BaseModel):
     user_email: Optional[str] = None
     action: str
     resource: str
-    details: Dict[str, Any]
+    details: Optional[Dict[str, Any]]
     ip_address: Optional[str] = None
     created_at: datetime
 

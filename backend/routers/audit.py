@@ -16,17 +16,13 @@ router = APIRouter(prefix="/api/v1/audit-logs", tags=["Audit Logs"])
     dependencies=[Depends(require_permission("audit:read"))]
 )
 def get_audit_logs(
-    resource: Optional[str] = Query(None, description="Filter logs by resource (e.g., clients, billing)"),
-    action: Optional[str] = Query(None, description="Filter logs by action (e.g., CREATE_CLIENT)"),
+    resource: Optional[str] = Query(None, description="Filter logs by resource"),
+    action: Optional[str] = Query(None, description="Filter logs by action"),
     limit: int = Query(50, ge=1, le=200),
     offset: int = Query(0, ge=0),
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """
-    Retrieves audit logs with optional filtering by resource and action, supported by pagination.
-    Requires 'audit:read' or '*:*' permission.
-    """
     query = db.query(AuditLog)
 
     if resource:
@@ -35,4 +31,10 @@ def get_audit_logs(
         query = query.filter(AuditLog.action == action)
 
     logs = query.order_by(AuditLog.created_at.desc()).offset(offset).limit(limit).all()
+
+    # Prevent Pydantic validation errors on null/empty JSONB fields
+    for log in logs:
+        if log.details is None:
+            log.details = {}
+
     return logs
