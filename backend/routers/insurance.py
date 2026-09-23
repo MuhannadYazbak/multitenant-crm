@@ -14,6 +14,16 @@ router = APIRouter(
     tags=["Insurance Module"]
 )
 
+# Centralized tenant type guard
+def check_insurance_tenant(db: Session):
+    tenant_type = db.info.get("tenant_type", "general")
+    if tenant_type != "insurance":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN, 
+            detail="Insurance module is not enabled for this workspace type"
+        )
+
+
 # -------------------------------------------------------------------
 # POLICY ENDPOINTS
 # -------------------------------------------------------------------
@@ -30,11 +40,7 @@ def create_policy(
     current_user: models.User = Depends(get_current_user),
     db: Session = Depends(get_db_for_tenant)
 ):
-    if db.info.get("tenant_type") != "insurance":
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN, 
-            detail="Insurance module is not enabled for this workspace type"
-        )
+    check_insurance_tenant(db)
 
     client = db.query(models.Client).filter(models.Client.id == policy_data.client_id).first()
     if not client:
@@ -45,8 +51,6 @@ def create_policy(
     
     db.add(new_policy)
     db.flush()
-    
-    response_data = schemas.InsurancePolicyResponse.model_validate(new_policy)
     
     log_activity(
         db=db,
@@ -59,7 +63,8 @@ def create_policy(
     )
     
     db.commit()
-    return response_data
+    db.refresh(new_policy)
+    return new_policy
 
 
 @router.get(
@@ -71,9 +76,7 @@ def get_client_policies(
     client_id: int, 
     db: Session = Depends(get_db_for_tenant)
 ):
-    if db.info.get("tenant_type") != "insurance":
-        raise HTTPException(status_code=403, detail="Module restricted to insurance tenants")
-
+    check_insurance_tenant(db)
     return db.query(models.InsurancePolicy).filter(models.InsurancePolicy.client_id == client_id).all()
 
 
@@ -88,8 +91,7 @@ def delete_policy(
     current_user: models.User = Depends(get_current_user),
     db: Session = Depends(get_db_for_tenant)
 ):
-    if db.info.get("tenant_type") != "insurance":
-        raise HTTPException(status_code=403, detail="Module restricted to insurance tenants")
+    check_insurance_tenant(db)
 
     policy = db.query(models.InsurancePolicy).filter(models.InsurancePolicy.id == policy_id).first()
     if not policy:
@@ -111,6 +113,7 @@ def delete_policy(
     db.commit()
     return None
 
+
 # -------------------------------------------------------------------
 # VEHICLE ENDPOINTS
 # -------------------------------------------------------------------
@@ -124,9 +127,7 @@ def get_client_vehicles(
     client_id: int,
     db: Session = Depends(get_db_for_tenant)
 ):
-    if db.info.get("tenant_type") != "insurance":
-        raise HTTPException(status_code=403, detail="Insurance module is not enabled for this workspace type")
-
+    check_insurance_tenant(db)
     return db.query(models.Vehicle).filter(models.Vehicle.client_id == client_id).all()
 
 
@@ -143,8 +144,7 @@ def create_vehicle(
     current_user: models.User = Depends(get_current_user),
     db: Session = Depends(get_db_for_tenant)
 ):
-    if db.info.get("tenant_type") != "insurance":
-        raise HTTPException(status_code=403, detail="Insurance module is not enabled for this workspace type")
+    check_insurance_tenant(db)
 
     client = db.query(models.Client).filter(models.Client.id == client_id).first()
     if not client:
@@ -156,20 +156,19 @@ def create_vehicle(
     db.add(new_vehicle)
     db.flush()
     
-    response_data = schemas.VehicleResponse.model_validate(new_vehicle)
-    
     log_activity(
         db=db,
         action="VEHICLE_CREATED",
         resource="vehicles",
         user_id=current_user.id,
         user_email=current_user.email,
-        details={"vehicle_id": new_vehicle.id, "plate_no": new_vehicle.plate_no, "client_id": client_id},
+        details={"vehicle_id": new_vehicle.id, "plate_no": getattr(new_vehicle, "plate_no", None), "client_id": client_id},
         request=request
     )
 
     db.commit()
-    return response_data
+    db.refresh(new_vehicle)
+    return new_vehicle
 
 
 @router.put(
@@ -178,14 +177,13 @@ def create_vehicle(
     dependencies=[Depends(require_permission("insurance:write"))]
 )
 def update_vehicle(
-    vehicle_id: str,
+    vehicle_id: int,
     vehicle_update: schemas.VehicleCreate,
     request: Request,
     current_user: models.User = Depends(get_current_user),
     db: Session = Depends(get_db_for_tenant)
 ):
-    if db.info.get("tenant_type") != "insurance":
-        raise HTTPException(status_code=403, detail="Insurance module is not enabled for this workspace type")
+    check_insurance_tenant(db)
 
     vehicle = db.query(models.Vehicle).filter(models.Vehicle.id == vehicle_id).first()
     if not vehicle:
@@ -195,9 +193,6 @@ def update_vehicle(
     for key, value in update_data.items():
         setattr(vehicle, key, value)
 
-    db.flush()
-    response_data = schemas.VehicleResponse.model_validate(vehicle)
-    
     log_activity(
         db=db,
         action="VEHICLE_UPDATED",
@@ -209,7 +204,8 @@ def update_vehicle(
     )
 
     db.commit()
-    return response_data
+    db.refresh(vehicle)
+    return vehicle
 
 
 @router.delete(
@@ -218,13 +214,12 @@ def update_vehicle(
     dependencies=[Depends(require_permission("insurance:delete"))]
 )
 def delete_vehicle(
-    vehicle_id: str, 
+    vehicle_id: int, 
     request: Request,
     current_user: models.User = Depends(get_current_user),
     db: Session = Depends(get_db_for_tenant)
 ):
-    if db.info.get("tenant_type") != "insurance":
-        raise HTTPException(status_code=403, detail="Module restricted to insurance tenants")
+    check_insurance_tenant(db)
 
     vehicle = db.query(models.Vehicle).filter(models.Vehicle.id == vehicle_id).first()
     if not vehicle:
@@ -245,6 +240,7 @@ def delete_vehicle(
     db.commit()
     return None
 
+
 # -------------------------------------------------------------------
 # PROPERTY ENDPOINTS
 # -------------------------------------------------------------------
@@ -258,12 +254,7 @@ def get_client_properties(
     client_id: int,
     db: Session = Depends(get_db_for_tenant)
 ):
-    if db.info.get("tenant_type") != "insurance":
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN, 
-            detail="Insurance module is not enabled for this workspace type"
-        )
-
+    check_insurance_tenant(db)
     return db.query(models.Property).filter(models.Property.client_id == client_id).all()
 
 
@@ -280,11 +271,7 @@ def create_property(
     current_user: models.User = Depends(get_current_user),
     db: Session = Depends(get_db_for_tenant)
 ):
-    if db.info.get("tenant_type") != "insurance":
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN, 
-            detail="Insurance module is not enabled for this workspace type"
-        )
+    check_insurance_tenant(db)
 
     client = db.query(models.Client).filter(models.Client.id == client_id).first()
     if not client:
@@ -295,8 +282,6 @@ def create_property(
     
     db.add(new_property)
     db.flush()
-    
-    response_data = schemas.PropertyResponse.model_validate(new_property)
     
     log_activity(
         db=db,
@@ -309,7 +294,8 @@ def create_property(
     )
 
     db.commit()
-    return response_data
+    db.refresh(new_property)
+    return new_property
 
 
 @router.put(
@@ -318,17 +304,13 @@ def create_property(
     dependencies=[Depends(require_permission("insurance:write"))]
 )
 def update_property(
-    property_id: str,
+    property_id: int,
     property_update: schemas.PropertyCreate,
     request: Request,
     current_user: models.User = Depends(get_current_user),
     db: Session = Depends(get_db_for_tenant)
 ):
-    if db.info.get("tenant_type") != "insurance":
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN, 
-            detail="Insurance module is not enabled for this workspace type"
-        )
+    check_insurance_tenant(db)
 
     prop = db.query(models.Property).filter(models.Property.id == property_id).first()
     if not prop:
@@ -338,9 +320,6 @@ def update_property(
     for key, value in update_data.items():
         setattr(prop, key, value)
 
-    db.flush()
-    response_data = schemas.PropertyResponse.model_validate(prop)
-    
     log_activity(
         db=db,
         action="PROPERTY_UPDATED",
@@ -352,7 +331,8 @@ def update_property(
     )
 
     db.commit()
-    return response_data
+    db.refresh(prop)
+    return prop
 
 
 @router.delete(
@@ -361,16 +341,12 @@ def update_property(
     dependencies=[Depends(require_permission("insurance:delete"))]
 )
 def delete_property(
-    property_id: str, 
+    property_id: int, 
     request: Request,
     current_user: models.User = Depends(get_current_user),
     db: Session = Depends(get_db_for_tenant)
 ):
-    if db.info.get("tenant_type") != "insurance":
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN, 
-            detail="Module restricted to insurance tenants"
-        )
+    check_insurance_tenant(db)
 
     prop = db.query(models.Property).filter(models.Property.id == property_id).first()
     if not prop:

@@ -1,15 +1,16 @@
 import os
 import shutil
 from typing import List
-from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form, status
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form, Request, status
 from sqlalchemy.orm import Session
 
 import models
 import schemas
 from database import get_db_for_tenant
 from models import User
+from auth_utils import get_current_user
 from rbac import require_permission
-from audit import log_activity  # Adjust import path based on your project structure
+from audit import log_activity
 
 router = APIRouter(
     prefix="/api/tabs",
@@ -55,12 +56,16 @@ def resolve_entity_context(entity_type: str, entity_id: int, db: Session):
 # 1. NOTES TAB
 # ==========================================
 
-@router.get("/{entity_type}/{entity_id}/notes", response_model=List[schemas.NoteResponse])
+@router.get(
+    "/{entity_type}/{entity_id}/notes", 
+    response_model=List[schemas.NoteResponse],
+    dependencies=[Depends(require_permission("notes:read"))]
+)
 def get_entity_notes(
     entity_type: str,
     entity_id: int,
     db: Session = Depends(get_db_for_tenant),
-    current_user: User = Depends(require_permission("notes:read"))
+    current_user: User = Depends(get_current_user)
 ):
     resolve_entity_context(entity_type, entity_id, db)
     query = db.query(models.Note)
@@ -75,13 +80,19 @@ def get_entity_notes(
     return query.order_by(models.Note.is_pinned.desc(), models.Note.created_at.desc()).all()
 
 
-@router.post("/{entity_type}/{entity_id}/notes", response_model=schemas.NoteResponse, status_code=status.HTTP_201_CREATED)
+@router.post(
+    "/{entity_type}/{entity_id}/notes", 
+    response_model=schemas.NoteResponse, 
+    status_code=status.HTTP_201_CREATED,
+    dependencies=[Depends(require_permission("notes:write"))]
+)
 def create_entity_note(
     entity_type: str,
     entity_id: int,
     payload: schemas.NoteCreate,
+    request: Request,
     db: Session = Depends(get_db_for_tenant),
-    current_user: User = Depends(require_permission("notes:write"))
+    current_user: User = Depends(get_current_user)
 ):
     ctx = resolve_entity_context(entity_type, entity_id, db)
 
@@ -103,25 +114,31 @@ def create_entity_note(
 
     log_activity(
         db=db,
-        user_id=current_user.id,
         action="NOTE_CREATED",
-        resource_type="note",
-        resource_id=new_note.id,
-        details={"entity_type": entity_type, "entity_id": entity_id}
+        resource="notes",
+        user_id=current_user.id,
+        user_email=current_user.email,
+        details={"note_id": new_note.id, "entity_type": entity_type, "entity_id": entity_id},
+        request=request
     )
 
-    response_data = schemas.NoteResponse.model_validate(new_note)
     db.commit()
-    return response_data
+    db.refresh(new_note)
+    return new_note
 
 
-@router.delete("/{entity_type}/{entity_id}/notes/{note_id}", status_code=status.HTTP_204_NO_CONTENT)
+@router.delete(
+    "/{entity_type}/{entity_id}/notes/{note_id}", 
+    status_code=status.HTTP_204_NO_CONTENT,
+    dependencies=[Depends(require_permission("notes:delete"))]
+)
 def delete_entity_note(
     entity_type: str,
     entity_id: int,
     note_id: int,
+    request: Request,
     db: Session = Depends(get_db_for_tenant),
-    current_user: User = Depends(require_permission("notes:delete"))
+    current_user: User = Depends(get_current_user)
 ):
     resolve_entity_context(entity_type, entity_id, db)
     note = db.query(models.Note).filter(models.Note.id == note_id).first()
@@ -132,11 +149,12 @@ def delete_entity_note(
 
     log_activity(
         db=db,
-        user_id=current_user.id,
         action="NOTE_DELETED",
-        resource_type="note",
-        resource_id=note_id,
-        details={"entity_type": entity_type, "entity_id": entity_id}
+        resource="notes",
+        user_id=current_user.id,
+        user_email=current_user.email,
+        details={"note_id": note_id, "entity_type": entity_type, "entity_id": entity_id},
+        request=request
     )
 
     db.commit()
@@ -147,13 +165,17 @@ def delete_entity_note(
 # 2. DOCUMENTS TAB
 # ==========================================
 
-@router.get("/{entity_type}/{entity_id}/documents", response_model=List[schemas.DocumentResponse])
+@router.get(
+    "/{entity_type}/{entity_id}/documents", 
+    response_model=List[schemas.DocumentResponse],
+    dependencies=[Depends(require_permission("documents:read"))]
+)
 def get_entity_documents(
     entity_type: str,
     entity_id: int,
     show_archived: bool = False,
     db: Session = Depends(get_db_for_tenant),
-    current_user: User = Depends(require_permission("documents:read"))
+    current_user: User = Depends(get_current_user)
 ):
     resolve_entity_context(entity_type, entity_id, db)
     query = db.query(models.Document).filter(models.Document.is_archived == show_archived)
@@ -168,14 +190,20 @@ def get_entity_documents(
     return query.order_by(models.Document.uploaded_at.desc()).all()
 
 
-@router.post("/{entity_type}/{entity_id}/documents", response_model=schemas.DocumentResponse, status_code=status.HTTP_201_CREATED)
+@router.post(
+    "/{entity_type}/{entity_id}/documents", 
+    response_model=schemas.DocumentResponse, 
+    status_code=status.HTTP_201_CREATED,
+    dependencies=[Depends(require_permission("documents:write"))]
+)
 def upload_entity_document(
     entity_type: str,
     entity_id: int,
+    request: Request,
     file_category: str = Form("General"),
     file: UploadFile = File(...),
     db: Session = Depends(get_db_for_tenant),
-    current_user: User = Depends(require_permission("documents:write"))
+    current_user: User = Depends(get_current_user)
 ):
     ctx = resolve_entity_context(entity_type, entity_id, db)
     tenant_slug = db.info.get("tenant_slug", "default_tenant")
@@ -206,25 +234,31 @@ def upload_entity_document(
 
     log_activity(
         db=db,
-        user_id=current_user.id,
         action="DOCUMENT_UPLOADED",
-        resource_type="document",
-        resource_id=doc.id,
-        details={"file_name": file.filename, "file_category": file_category}
+        resource="documents",
+        user_id=current_user.id,
+        user_email=current_user.email,
+        details={"doc_id": doc.id, "file_name": file.filename, "file_category": file_category},
+        request=request
     )
 
-    response_data = schemas.DocumentResponse.model_validate(doc)
     db.commit()
-    return response_data
+    db.refresh(doc)
+    return doc
 
 
-@router.put("/{entity_type}/{entity_id}/documents/{document_id}/archive", response_model=schemas.DocumentResponse)
+@router.put(
+    "/{entity_type}/{entity_id}/documents/{document_id}/archive", 
+    response_model=schemas.DocumentResponse,
+    dependencies=[Depends(require_permission("documents:write"))]
+)
 def archive_entity_document(
     entity_type: str,
     entity_id: int,
     document_id: int,
+    request: Request,
     db: Session = Depends(get_db_for_tenant),
-    current_user: User = Depends(require_permission("documents:write"))
+    current_user: User = Depends(get_current_user)
 ):
     resolve_entity_context(entity_type, entity_id, db)
     doc = db.query(models.Document).filter(models.Document.id == document_id).first()
@@ -232,32 +266,36 @@ def archive_entity_document(
         raise HTTPException(status_code=404, detail="Document not found")
 
     doc.is_archived = True
-    db.flush()
 
     log_activity(
         db=db,
-        user_id=current_user.id,
         action="DOCUMENT_ARCHIVED",
-        resource_type="document",
-        resource_id=document_id,
-        details={"file_name": doc.file_name}
+        resource="documents",
+        user_id=current_user.id,
+        user_email=current_user.email,
+        details={"document_id": document_id, "file_name": doc.file_name},
+        request=request
     )
 
-    response_data = schemas.DocumentResponse.model_validate(doc)
     db.commit()
-    return response_data
+    db.refresh(doc)
+    return doc
 
 
 # ==========================================
 # 3. BILLING TAB
 # ==========================================
 
-@router.get("/{entity_type}/{entity_id}/billing", response_model=List[schemas.BillingEntryResponse])
+@router.get(
+    "/{entity_type}/{entity_id}/billing", 
+    response_model=List[schemas.BillingEntryResponse],
+    dependencies=[Depends(require_permission("billing:read"))]
+)
 def get_entity_billing_entries(
     entity_type: str,
     entity_id: int,
     db: Session = Depends(get_db_for_tenant),
-    current_user: User = Depends(require_permission("billing:read"))
+    current_user: User = Depends(get_current_user)
 ):
     resolve_entity_context(entity_type, entity_id, db)
     query = db.query(models.BillingEntry)
@@ -272,13 +310,19 @@ def get_entity_billing_entries(
     return query.order_by(models.BillingEntry.created_at.desc()).all()
 
 
-@router.post("/{entity_type}/{entity_id}/billing", response_model=schemas.BillingEntryResponse, status_code=status.HTTP_201_CREATED)
+@router.post(
+    "/{entity_type}/{entity_id}/billing", 
+    response_model=schemas.BillingEntryResponse, 
+    status_code=status.HTTP_201_CREATED,
+    dependencies=[Depends(require_permission("billing:write"))]
+)
 def create_entity_billing_entry(
     entity_type: str,
     entity_id: int,
     billing_data: schemas.BillingEntryCreate,
+    request: Request,
     db: Session = Depends(get_db_for_tenant),
-    current_user: User = Depends(require_permission("billing:write"))
+    current_user: User = Depends(get_current_user)
 ):
     context = resolve_entity_context(entity_type, entity_id, db)
 
@@ -302,25 +346,31 @@ def create_entity_billing_entry(
 
     log_activity(
         db=db,
-        user_id=current_user.id,
         action="BILLING_ENTRY_CREATED",
-        resource_type="billing_entry",
-        resource_id=entry.id,
-        details={"total_amount": float(entry.total_amount)}
+        resource="billing_entries",
+        user_id=current_user.id,
+        user_email=current_user.email,
+        details={"billing_id": entry.id, "total_amount": float(getattr(entry, "total_amount", 0.0))},
+        request=request
     )
 
-    response_data = schemas.BillingEntryResponse.model_validate(entry)
     db.commit()
-    return response_data
+    db.refresh(entry)
+    return entry
 
 
-@router.delete("/{entity_type}/{entity_id}/billing/{billing_id}", status_code=status.HTTP_204_NO_CONTENT)
+@router.delete(
+    "/{entity_type}/{entity_id}/billing/{billing_id}", 
+    status_code=status.HTTP_204_NO_CONTENT,
+    dependencies=[Depends(require_permission("billing:delete"))]
+)
 def delete_entity_billing_entry(
     entity_type: str,
     entity_id: int,
     billing_id: int,
+    request: Request,
     db: Session = Depends(get_db_for_tenant),
-    current_user: User = Depends(require_permission("billing:delete"))
+    current_user: User = Depends(get_current_user)
 ):
     resolve_entity_context(entity_type, entity_id, db)
     entry = db.query(models.BillingEntry).filter(models.BillingEntry.id == billing_id).first()
@@ -331,11 +381,12 @@ def delete_entity_billing_entry(
 
     log_activity(
         db=db,
-        user_id=current_user.id,
         action="BILLING_ENTRY_DELETED",
-        resource_type="billing_entry",
-        resource_id=billing_id,
-        details={"entity_type": entity_type, "entity_id": entity_id}
+        resource="billing_entries",
+        user_id=current_user.id,
+        user_email=current_user.email,
+        details={"billing_id": billing_id, "entity_type": entity_type, "entity_id": entity_id},
+        request=request
     )
 
     db.commit()
