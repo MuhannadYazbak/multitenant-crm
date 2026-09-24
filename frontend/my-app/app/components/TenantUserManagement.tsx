@@ -339,6 +339,7 @@ export default function TenantUserManagement({ tenantSlug: propTenantSlug }: { t
                   className="w-full p-2 border border-slate-300 rounded text-sm outline-none focus:ring-2 focus:ring-blue-500"
                 >
                   <option value={3}>Viewer (Read-only)</option>
+                  <option value={5}>Editor (Read/Write, No User Mgmt)</option>
                   <option value={2}>Manager (Read/Write)</option>
                   <option value={1}>Admin (Full Access)</option>
                 </select>
