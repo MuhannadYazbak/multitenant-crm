@@ -18,7 +18,7 @@ from rbac import require_permission
 from audit import log_activity
 from schemas import TenantLoginRequest
 from models import TenantAccount
-from routers import insurance, dashboard, legal, admin, tabs_manager, auth, internal, audit
+from routers import insurance, dashboard, legal, admin, tabs_manager, auth, internal, audit, tenant_users
 
 models.Base.metadata.create_all(bind=engine)
 
@@ -44,6 +44,7 @@ app.include_router(tabs_manager.router)
 app.include_router(auth.router)
 app.include_router(internal.router)
 app.include_router(audit.router)
+app.include_router(tenant_users.router)
 
 # --- AUTH & TENANT ENDPOINTS ---
 

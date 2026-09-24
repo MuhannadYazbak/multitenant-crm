@@ -349,13 +349,24 @@ class UserCreate(UserBase):
     password: str
     role_ids: List[int] = []
 
-class UserResponse(UserBase):
+# class UserResponse(UserBase):
+#     id: int
+#     tenant_id: int
+#     created_at: datetime
+#     last_active: 
+#     model_config = ConfigDict(from_attributes=True)
+
+class UserResponse(BaseModel):
     id: int
     tenant_id: int
-    created_at: datetime
+    email: str
+    full_name: str
+    is_active: bool
+    created_at: Optional[datetime] = None
+    last_active: Optional[datetime] = None  # <-- Add this field
 
-    model_config = ConfigDict(from_attributes=True)
-
+    class Config:
+        from_attributes = True
 
 class RoleBase(BaseModel):
     name: str

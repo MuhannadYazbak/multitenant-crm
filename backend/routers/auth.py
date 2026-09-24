@@ -4,7 +4,7 @@ from typing import List, Set, Any, Optional
 from fastapi import APIRouter, HTTPException, status, Depends
 from sqlalchemy.orm import Session
 from pydantic import BaseModel, EmailStr
-
+from datetime import datetime,timezone
 from database import get_db, find_account_by_identifier, update_account_password
 from auth_utils import (
     hash_password,
@@ -119,6 +119,9 @@ def login(payload: LoginPayload, db: Session = Depends(get_db)):
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Tenant workspace is inactive or suspended"
         )
+    user.last_active = datetime.now(timezone.utc)
+    db.commit()
+    db.refresh(user)
 
     # 3. Process roles and permissions
     roles, permissions = get_user_roles_and_permissions(user)

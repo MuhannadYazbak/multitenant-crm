@@ -398,6 +398,24 @@ export async function deleteWitness(tenant: string, witnessId: string): Promise<
   return apiFetch(`/api/legal/witnesses/${witnessId}`, { method: "DELETE" }, tenant);
 }
 
+// --- TENANT USERS API HELPERS ---
+
+export async function fetchTenantUsers(tenant: string) {
+  return apiFetch("/api/tenant/users", { method: "GET" }, tenant);
+}
+
+export async function createTenantUser(tenant: string, payload: { full_name: string; email: string; password: string; role_id: number }) {
+  return apiFetch("/api/tenant/users", { method: "POST", body: JSON.stringify(payload) }, tenant);
+}
+
+export async function updateTenantUser(tenant: string, userId: number, payload: any) {
+  return apiFetch(`/api/tenant/users/${userId}`, { method: "PUT", body: JSON.stringify(payload) }, tenant);
+}
+
+export async function deleteTenantUser(tenant: string, userId: number) {
+  return apiFetch(`/api/tenant/users/${userId}`, { method: "DELETE" }, tenant);
+}
+
 async function handleSubscribe(tenantId: string, priceId: string) {
   priceId = "";
   try {
