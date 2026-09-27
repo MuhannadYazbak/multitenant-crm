@@ -89,12 +89,56 @@ def create_user_access_token(data: dict) -> str:
     to_encode.update({"exp": expire, "type": "user_access"})
     return jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
 
+# def get_current_user(
+#     credentials: HTTPAuthorizationCredentials = Depends(security),
+#     db: Session = Depends(get_db)
+# ):
+#     """Decodes Bearer token, validates user in database, and ensures active status."""
+#     from models import User  # Local import to prevent circular dependency
+#     token = credentials.credentials
+#     try:
+#         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+#         user_id = payload.get("sub")
+#         if user_id is None:
+#             raise HTTPException(
+#                 status_code=status.HTTP_401_UNAUTHORIZED,
+#                 detail="Invalid token payload",
+#             )
+#     except jwt.ExpiredSignatureError:
+#         raise HTTPException(
+#             status_code=status.HTTP_401_UNAUTHORIZED,
+#             detail="User session expired. Please log in again.",
+#         )
+#     except jwt.PyJWTError:
+#         raise HTTPException(
+#             status_code=status.HTTP_401_UNAUTHORIZED,
+#             detail="Could not validate credentials",
+#         )
+
+#     if user_id.isdigit():
+#         user = db.query(User).filter(User.id == int(user_id)).first()
+#     else:
+#         user = db.query(User).filter(User.email == user_id).first()
+#     if not user:
+#         raise HTTPException(
+#             status_code=status.HTTP_401_UNAUTHORIZED,
+#             detail="User not found",
+#         )
+#     if not user.is_active:
+#         raise HTTPException(
+#             status_code=status.HTTP_403_FORBIDDEN,
+#             detail="Inactive user account",
+#         )
+
+#     return user
+
+from sqlalchemy import text  # Import text
+
 def get_current_user(
     credentials: HTTPAuthorizationCredentials = Depends(security),
     db: Session = Depends(get_db)
 ):
-    """Decodes Bearer token, validates user in database, and ensures active status."""
-    from models import User  # Local import to prevent circular dependency
+    from models import User
     token = credentials.credentials
     try:
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
@@ -119,6 +163,7 @@ def get_current_user(
         user = db.query(User).filter(User.id == int(user_id)).first()
     else:
         user = db.query(User).filter(User.email == user_id).first()
+
     if not user:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -129,5 +174,15 @@ def get_current_user(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Inactive user account",
         )
+
+    # --- Fetch user's role_ids from user_roles junction table ---
+    role_rows = db.execute(
+        text("SELECT role_id FROM user_roles WHERE user_id = :uid"),
+        {"uid": user.id}
+    ).fetchall()
+    
+    # Store list of role IDs (e.g. [1, 2]) and primary role_id (or None)
+    user.role_ids = [r[0] for r in role_rows]
+    user.role_id = user.role_ids[0] if user.role_ids else None
 
     return user

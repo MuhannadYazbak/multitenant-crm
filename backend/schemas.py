@@ -383,12 +383,13 @@ class RoleResponse(RoleBase):
 
 class AuditLogResponse(BaseModel):
     id: int
+    tenant_id: Optional[int] = None
     user_id: Optional[int] = None
     user_email: Optional[str] = None
     action: str
     resource: str
     details: Optional[Dict[str, Any]]
     ip_address: Optional[str] = None
-    created_at: datetime
+    created_at: Optional[datetime] = None
 
     model_config = ConfigDict(from_attributes=True)

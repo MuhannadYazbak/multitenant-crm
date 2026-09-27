@@ -264,8 +264,10 @@ class UserRole(Base):
 
 class AuditLog(Base):
     __tablename__ = "audit_logs"
-
+    __table_args__ = {"schema":"public"}
+    
     id = Column(Integer, primary_key=True, index=True)
+    tenant_id = Column(Integer, ForeignKey("public.tenant_accounts.id", ondelete="CASCADE"), nullable=True, index=True)
     user_id = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
     user_email = Column(String(100), nullable=True)
     action = Column(String(100), nullable=False)    # e.g., "CREATE_CLIENT", "DELETE_POLICY"

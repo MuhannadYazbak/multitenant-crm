@@ -1,10 +1,10 @@
 # backend/routers/admin.py
 from typing import List
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, Request
 from sqlalchemy.orm import Session
 from sqlalchemy import text
 from pydantic import BaseModel
-
+from datetime import datetime
 from database import get_db
 from models import TenantAccount, Admin, User, Role, UserRole, AuditLog
 from schemas import (
@@ -20,6 +20,7 @@ from auth_utils import (
     create_admin_access_token, 
     get_current_admin
 )
+from audit import log_activity
 
 router = APIRouter(prefix="/api/admin", tags=["admin"])
 
@@ -47,8 +48,9 @@ class AuditLogResponse(BaseModel):
     id: int
     user_email: str
     action: str
-    target: str
-    timestamp: str
+    resource: str | None = None
+    details: dict | None = None
+    created_at: datetime | None = None
 
     class Config:
         from_attributes = True
@@ -102,7 +104,7 @@ def admin_login(payload: AdminLogin, db: Session = Depends(get_db)):
 @router.post("/seed-initial-admin", status_code=201)
 def seed_initial_admin(payload: AdminLogin, db: Session = Depends(get_db)):
     """Helper route to create the first admin user if none exists."""
-    existing = db.query(Admin).filter(User.username == payload.username).first()
+    existing = db.query(Admin).filter(Admin.username == payload.username).first()
     if existing:
         raise HTTPException(status_code=400, detail="Admin user already exists.")
     
@@ -120,6 +122,7 @@ def seed_initial_admin(payload: AdminLogin, db: Session = Depends(get_db)):
 @router.post("/roles", response_model=RoleResponsePayload, status_code=201)
 def create_role(
     payload: RoleCreatePayload,
+    request: Request,
     db: Session = Depends(get_db),
     admin_username: str = Depends(get_current_admin)
 ):
@@ -133,6 +136,17 @@ def create_role(
         permissions=payload.permissions
     )
     db.add(new_role)
+    db.flush()
+
+    log_activity(
+        db=db,
+        action="ROLE_CREATED",
+        resource="roles",
+        user_email=admin_username,
+        details={"role_id": new_role.id, "role_name": new_role.name, "permissions": payload.permissions},
+        request=request
+    )
+
     db.commit()
     db.refresh(new_role)
     return new_role
@@ -150,6 +164,7 @@ def list_roles(
 def assign_role_to_user(
     user_id: int,
     payload: AssignRolePayload,
+    request: Request,
     db: Session = Depends(get_db),
     admin_username: str = Depends(get_current_admin)
 ):
@@ -172,16 +187,17 @@ def assign_role_to_user(
     user_role = UserRole(user_id=user_id, role_id=payload.role_id)
     db.add(user_role)
     
-    # Audit log
-    db.add(AuditLog(
-    user_email=admin_username,
-    action="ROLE_ASSIGNED",
-    resource="roles",
-    details={"target_user_id": user_id, "role_id": payload.role_id, "role_name": role.name}
-))
+    log_activity(
+        db=db,
+        action="ROLE_ASSIGNED",
+        resource="roles",
+        tenant_id=user.tenant_id,
+        user_email=admin_username,
+        details={"target_user_id": user_id, "role_id": payload.role_id, "role_name": role.name},
+        request=request
+    )
 
     db.commit()
-
     return {"message": f"Role '{role.name}' assigned to user successfully."}
 
 
@@ -189,9 +205,11 @@ def assign_role_to_user(
 def revoke_role_from_user(
     user_id: int,
     role_id: int,
+    request: Request,
     db: Session = Depends(get_db),
     admin_username: str = Depends(get_current_admin)
 ):
+    user = db.query(User).filter(User.id == user_id).first()
     user_role = (
         db.query(UserRole)
         .filter(UserRole.user_id == user_id, UserRole.role_id == role_id)
@@ -203,13 +221,15 @@ def revoke_role_from_user(
     role_name = user_role.role.name if user_role.role else f"Role #{role_id}"
     db.delete(user_role)
 
-    # Audit log
-    db.add(AuditLog(
-    user_email=admin_username,
-    action="ROLE_REVOKED",
-    resource="roles",
-    details={"target_user_id": user_id, "role_id": role_id}
-    ))
+    log_activity(
+        db=db,
+        action="ROLE_REVOKED",
+        resource="roles",
+        tenant_id=user.tenant_id if user else None,
+        user_email=admin_username,
+        details={"target_user_id": user_id, "role_id": role_id, "role_name": role_name},
+        request=request
+    )
 
     db.commit()
     return {"message": "Role revoked successfully."}
@@ -231,6 +251,7 @@ def list_audit_logs(
 @router.post("/tenants", response_model=TenantResponse, status_code=201)
 def onboard_tenant(
     payload: TenantCreate,
+    request: Request,
     db: Session = Depends(get_db),
     admin_username: str = Depends(get_current_admin),
 ):
@@ -355,7 +376,7 @@ def onboard_tenant(
             status="active",
         )
         db.add(new_account)
-        db.flush()  # Flushes to populate new_account.id
+        db.flush()
 
         # 6. Create Initial Tenant Manager User
         manager_email = f"manager@{payload.company_name.lower().replace(' ', '')}.com"
@@ -369,18 +390,20 @@ def onboard_tenant(
         db.add(manager_user)
         db.flush()
 
-        # Assign "Manager" or "Admin" Role if exists
         manager_role = db.query(Role).filter(Role.name.ilike("Manager")).first() or db.query(Role).filter(Role.name.ilike("Admin")).first()
         if manager_role:
             db.add(UserRole(user_id=manager_user.id, role_id=manager_role.id))
 
         # 7. Record System Audit Log Entry
-        db.add(AuditLog(
-            user_email=admin_username,
+        log_activity(
+            db=db,
             action="TENANT_PROVISIONED",
             resource="tenants",
-            details={"company_name": payload.company_name, "tenant_type": payload.tenant_type}
-        ))
+            tenant_id=new_account.id,
+            user_email=admin_username,
+            details={"company_name": payload.company_name, "tenant_type": payload.tenant_type},
+            request=request
+        )
 
         db.commit()
         db.refresh(new_account)
@@ -406,6 +429,7 @@ def list_tenants(
 def update_tenant_status(
     company_name: str,
     payload: TenantStatusUpdate,
+    request: Request,
     db: Session = Depends(get_db),
     admin_username: str = Depends(get_current_admin)
 ):
@@ -416,13 +440,15 @@ def update_tenant_status(
     old_status = tenant.status
     tenant.status = payload.status
 
-    # Record Audit Log
-    db.add(AuditLog(
-        user_email=admin_username,
-        action=f"TENANT_STATUS_{payload.status.upper()} (was {old_status.upper()})",
+    log_activity(
+        db=db,
+        action="TENANT_STATUS_UPDATED",
         resource="tenants",
-        details={"company_name": company_name, "previous_status": old_status, "new_status": payload.status}
-    ))
+        tenant_id=tenant.id,
+        user_email=admin_username,
+        details={"company_name": company_name, "previous_status": old_status, "new_status": payload.status},
+        request=request
+    )
 
     db.commit()
     db.refresh(tenant)

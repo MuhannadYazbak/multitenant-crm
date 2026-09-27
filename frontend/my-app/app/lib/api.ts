@@ -88,6 +88,56 @@ export async function apiFetch<T = any>(
   return response.json();
 }
 
+
+// --- Audit Logs ---
+
+export interface AuditLog {
+  id: number;
+  tenant_id?: number | null;
+  user_email?: string | null;
+  action: string;
+  resource?: string | null;
+  details?: Record<string, any> | null;
+  ip_address?: string | null;
+  created_at?: string | null;
+}
+
+/**
+ * Fetches activity audit logs for either Super Admin (system-wide) or Tenant Manager (tenant-scoped).
+ */
+// export async function fetchAuditLogs(tenantSlug?: string): Promise<AuditLog[]> {
+//   // Prevent calling backend if tenantSlug evaluates to invalid placeholder strings
+//   if (tenantSlug === "audit-logs" || tenantSlug === "undefined") {
+//     console.warn("Prevented fetch Audit Logs call with invalid slug context:", tenantSlug);
+//     return [];
+//   }
+
+//   // Choose REST route based on scope:
+//   // System Admin  -> GET /api/admin/audit-logs
+//   // Tenant Manager -> GET /api/tenants/{tenantSlug}/audit-logs
+//   const endpoint = tenantSlug
+//     ? `/api/tenant/mypage/${tenantSlug}/audit-logs`
+//     : `/api/admin/audit-logs`;
+
+//   // Delegate request to apiFetch to leverage unified Bearer token management,
+//   // X-Tenant header injection, and 401/403 RBAC error handling.
+//   return apiFetch<AuditLog[]>(endpoint, { method: "GET" }, tenantSlug);
+// }
+
+export async function fetchAuditLogs(tenantSlug?: string): Promise<AuditLog[]> {
+  if (tenantSlug === "audit-logs" || tenantSlug === "undefined") {
+    console.warn("Prevented fetch Audit Logs call with invalid slug context:", tenantSlug);
+    return [];
+  }
+
+  // Use /api/admin/audit-logs when no tenant slug is present,
+  // and /api/v1/audit-logs when scoped to a specific tenant/workspace.
+  const endpoint = tenantSlug ? `/api/v1/audit-logs` : `/api/admin/audit-logs`;
+
+  return apiFetch<AuditLog[]>(endpoint, { method: "GET" }, tenantSlug);
+}
+
+
 // --- CLIENT APIS ---
 
 export const fetchDashboardData = async (tenantName: string) => {

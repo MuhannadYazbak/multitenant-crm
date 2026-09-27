@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import AuditLogTable from "@/app/components/AuditLogTable"; // Adjust path if placed in @/components/AuditLogTable
 
 interface Role {
   id: number;
@@ -24,23 +25,10 @@ interface Tenant {
   created_at: string;
 }
 
-// Fixed Interface to match SQLAlchemy AuditLog model & FastAPI Response Schema
-interface AuditLog {
-  id: number;
-  user_id?: number | null;
-  user_email?: string | null;
-  action: string;
-  resource: string;
-  details?: Record<string, any>;
-  ip_address?: string | null;
-  created_at: string;
-}
-
 export default function AdminDashboardPage() {
   const router = useRouter();
   const [currentUser, setCurrentUser] = useState<UserData | null>(null);
   const [tenants, setTenants] = useState<Tenant[]>([]);
-  const [auditLogs, setAuditLogs] = useState<AuditLog[]>([]);
   const [activeTab, setActiveTab] = useState<"tenants" | "audit">("tenants");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -80,7 +68,6 @@ export default function AdminDashboardPage() {
 
       setCurrentUser(parsedUser);
       fetchTenants(token);
-      fetchAuditLogs(token);
     } catch (err) {
       localStorage.clear();
       router.push("/admin/login");
@@ -111,23 +98,6 @@ export default function AdminDashboardPage() {
     }
   };
 
-  const fetchAuditLogs = async (token: string) => {
-    try {
-      const res = await fetch(`${API_BASE_URL}/api/v1/audit-logs/`, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      });
-
-      if (res.ok) {
-        const data = await res.json();
-        setAuditLogs(data);
-      }
-    } catch (err) {
-      console.warn("Audit logs endpoint unfulfilled or unreachable.");
-    }
-  };
-
   const handleStatusChange = async (companyName: string, newStatus: string) => {
     const token = localStorage.getItem("admin_token") || localStorage.getItem("access_token");
     if (!token) return;
@@ -153,7 +123,6 @@ export default function AdminDashboardPage() {
       if (!res.ok) throw new Error("Failed to update workspace status.");
 
       await fetchTenants(token);
-      await fetchAuditLogs(token);
     } catch (err: any) {
       alert(err.message || "Failed to update tenant status");
     } finally {
@@ -194,7 +163,6 @@ export default function AdminDashboardPage() {
       setIsModalOpen(false);
 
       await fetchTenants(token);
-      await fetchAuditLogs(token);
     } catch (err: any) {
       setModalError(err.message);
     } finally {
@@ -291,7 +259,7 @@ export default function AdminDashboardPage() {
                 : "border-transparent text-slate-400 hover:text-slate-200"
             }`}
           >
-            System Audit Logs ({auditLogs.length})
+            System Audit Logs
           </button>
         </div>
 
@@ -323,7 +291,7 @@ export default function AdminDashboardPage() {
                             tenant.status === "active"
                               ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20"
                               : tenant.status === "frozen"
-                              ? "bg-amber-500/10 text-amber-400 border border-amber-500/20"
+                              ? "bg-amber500/10 text-amber-400 border border-amber-500/20"
                               : "bg-rose-500/10 text-rose-400 border border-rose-500/20"
                           }`}
                         >
@@ -376,47 +344,7 @@ export default function AdminDashboardPage() {
 
         {/* --- Audit Logs View --- */}
         {activeTab === "audit" && (
-          <div className="bg-slate-800 border border-slate-700 rounded-xl overflow-hidden shadow-xl">
-            <div className="overflow-x-auto">
-              <table className="w-full text-left text-sm text-slate-300">
-                <thead className="bg-slate-900/50 uppercase text-xs tracking-wider text-slate-400 border-b border-slate-700">
-                  <tr>
-                    <th className="px-6 py-4">Log ID</th>
-                    <th className="px-6 py-4">User</th>
-                    <th className="px-6 py-4">Action</th>
-                    <th className="px-6 py-4">Resource</th>
-                    <th className="px-6 py-4 text-right">Timestamp</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-700/60">
-                  {auditLogs.map((log) => (
-                    <tr key={log.id} className="hover:bg-slate-700/30 transition-colors">
-                      <td className="px-6 py-4 text-slate-500 font-mono">#{log.id}</td>
-                      <td className="px-6 py-4 text-slate-200 font-medium">
-                        {log.user_email || "System Admin"}
-                      </td>
-                      <td className="px-6 py-4">
-                        <span className="px-2 py-1 bg-slate-900 rounded font-mono text-xs text-indigo-300 border border-indigo-500/20">
-                          {log.action}
-                        </span>
-                      </td>
-                      <td className="px-6 py-4 text-slate-300 capitalize">{log.resource}</td>
-                      <td className="px-6 py-4 text-right font-mono text-xs text-slate-400">
-                        {new Date(log.created_at).toLocaleString()}
-                      </td>
-                    </tr>
-                  ))}
-                  {auditLogs.length === 0 && (
-                    <tr>
-                      <td colSpan={5} className="px-6 py-8 text-center text-slate-500">
-                        No audit events recorded yet.
-                      </td>
-                    </tr>
-                  )}
-                </tbody>
-              </table>
-            </div>
-          </div>
+          <AuditLogTable />
         )}
 
       </div>

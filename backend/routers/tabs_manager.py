@@ -1,3 +1,4 @@
+# tabs_manager.py
 import os
 import shutil
 from typing import List
@@ -116,6 +117,7 @@ def create_entity_note(
         db=db,
         action="NOTE_CREATED",
         resource="notes",
+        tenant_id=current_user.tenant_id,
         user_id=current_user.id,
         user_email=current_user.email,
         details={"note_id": new_note.id, "entity_type": entity_type, "entity_id": entity_id},
@@ -151,6 +153,7 @@ def delete_entity_note(
         db=db,
         action="NOTE_DELETED",
         resource="notes",
+        tenant_id=current_user.tenant_id,
         user_id=current_user.id,
         user_email=current_user.email,
         details={"note_id": note_id, "entity_type": entity_type, "entity_id": entity_id},
@@ -236,6 +239,7 @@ def upload_entity_document(
         db=db,
         action="DOCUMENT_UPLOADED",
         resource="documents",
+        tenant_id=current_user.tenant_id,
         user_id=current_user.id,
         user_email=current_user.email,
         details={"doc_id": doc.id, "file_name": file.filename, "file_category": file_category},
@@ -271,6 +275,7 @@ def archive_entity_document(
         db=db,
         action="DOCUMENT_ARCHIVED",
         resource="documents",
+        tenant_id=current_user.tenant_id,
         user_id=current_user.id,
         user_email=current_user.email,
         details={"document_id": document_id, "file_name": doc.file_name},
@@ -348,6 +353,7 @@ def create_entity_billing_entry(
         db=db,
         action="BILLING_ENTRY_CREATED",
         resource="billing_entries",
+        tenant_id=current_user.tenant_id,
         user_id=current_user.id,
         user_email=current_user.email,
         details={"billing_id": entry.id, "total_amount": float(getattr(entry, "total_amount", 0.0))},
@@ -383,6 +389,7 @@ def delete_entity_billing_entry(
         db=db,
         action="BILLING_ENTRY_DELETED",
         resource="billing_entries",
+        tenant_id=current_user.tenant_id,
         user_id=current_user.id,
         user_email=current_user.email,
         details={"billing_id": billing_id, "entity_type": entity_type, "entity_id": entity_id},

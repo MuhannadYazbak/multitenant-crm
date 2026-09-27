@@ -126,15 +126,26 @@ def add_tenant_client(
         res_status = getattr(db_client, "status", "active") or "active"
         res_custom = db_client.custom_fields or {}
 
+        # log_activity(
+        #     db=db,
+        #     action="CLIENT_CREATED",
+        #     resource="clients",
+        #     user_id=current_user.id,
+        #     user_email=current_user.email,
+        #     details={"client_id": res_id, "name": res_name},
+        #     request=request
+        # )
+        
         log_activity(
-            db=db,
-            action="CLIENT_CREATED",
-            resource="clients",
-            user_id=current_user.id,
-            user_email=current_user.email,
-            details={"client_id": res_id, "name": res_name},
-            request=request
-        )
+    db=db,
+    action="CLIENT_CREATED",
+    resource="clients",
+    tenant_id=getattr(current_user, "tenant_id", None),
+    user_id=current_user.id,
+    user_email=current_user.email,
+    details={"client_id": res_id, "name": res_name},
+    request=request
+)
 
         db.commit()
 
@@ -212,6 +223,7 @@ def update_client(
             db=db,
             action="CLIENT_UPDATED",
             resource="clients",
+            tenant_id=getattr(current_user, "tenant_id", None),
             user_id=current_user.id,
             user_email=current_user.email,
             details={"client_id": res_id, "name": res_name},
@@ -254,6 +266,7 @@ def soft_delete_client(
         db=db,
         action="CLIENT_DELETED",
         resource="clients",
+        tenant_id=getattr(current_user, "tenant_id", None),
         user_id=current_user.id,
         user_email=current_user.email,
         details={"client_id": client_id},

@@ -1,6 +1,6 @@
 # backend/routers/audit.py
 from typing import List, Optional
-from fastapi import APIRouter, Depends, Query, HTTPException, Request
+from fastapi import APIRouter, Depends, Query, HTTPException
 from sqlalchemy.orm import Session
 from database import get_db
 from models import AuditLog, User
@@ -25,6 +25,23 @@ def get_audit_logs(
 ):
     query = db.query(AuditLog)
 
+    # --- Role-Based Scoping ---
+    if current_user.role_id in [1,4]:
+        # Admin or Super Admin: Sees all logs across all tenants
+        pass
+    elif current_user.role_id == 2:
+        # Tenant Manager (2): All logs for their tenant
+        query = query.filter(AuditLog.tenant_id == current_user.tenant_id)
+    else:
+        # Editors (5) & Viewers (3): Only their own single most recent log
+        query = query.filter(
+            AuditLog.tenant_id == current_user.tenant_id,
+            AuditLog.user_id == current_user.id
+        )
+        limit = 1
+        offset = 0
+
+    # --- Filters ---
     if resource:
         query = query.filter(AuditLog.resource == resource)
     if action:
