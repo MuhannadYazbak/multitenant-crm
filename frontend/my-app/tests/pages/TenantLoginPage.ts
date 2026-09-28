@@ -14,7 +14,7 @@ export class TenantLoginPage {
     // Locators based on labels, placeholders, role, and text content
     this.emailInput = page.getByPlaceholder("user@company.com");
     this.passwordInput = page.getByPlaceholder("••••••••");
-    this.loginButton = page.getByRole("button", { name: /Login to Workspace|Verifying.../i });
+    this.loginButton = page.getByPlaceholder("Sign In");
     this.errorMessage = page.locator(".text-red-500");
     this.adminPortalLink = page.getByRole("link", { name: "Admin Tenant Portal →" });
   }

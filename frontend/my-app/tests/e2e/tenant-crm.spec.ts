@@ -17,8 +17,8 @@ test.describe("Tenant CRM Full End-to-End Suite", () => {
   test("complete client lifecycle: login, create, view profile, edit, search, delete", async ({ page }) => {
     // 1. Workspace Login
     await tenantLogin.goto();
-    await tenantLogin.login("company-a", "NewTenantSecret123!");
-    await expect(page).toHaveURL(/\/company-a\/mypage/);
+    await tenantLogin.login("yazbakm@gmail.com", "my@8391");
+    await expect(page).toHaveURL(/\/yazbak\/mypage/);
 
     // 2. Provision New Client with dynamic dynamic email/name to avoid DB 500 unique constraints
     const uniqueId = Date.now().toString(36).replace(/[0-9]/g, (m) => String.fromCharCode(65 + parseInt(m)));
@@ -53,7 +53,7 @@ test.describe("Tenant CRM Full End-to-End Suite", () => {
 
     // 3. Navigate to Client Detail Page via 'Show' Button
     await Promise.all([
-      page.waitForURL(`**/company-a/mypage/*`),
+      page.waitForURL(`**/yazbak/mypage/*`),
       clientRow.getByRole("button", { name: "Show" }).click(),
     ]);
 
@@ -73,7 +73,7 @@ test.describe("Tenant CRM Full End-to-End Suite", () => {
 
     // 6. Return to Dashboard and Cleanup
     await clientDetail.goBack();
-    await expect(page).toHaveURL(/\/company-a\/mypage/);
+    await expect(page).toHaveURL(/\/yazbak\/mypage/);
 
     await tenantDashboard.deleteClientByName(originalClient.name);
 
