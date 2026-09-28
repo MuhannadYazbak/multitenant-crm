@@ -2,7 +2,7 @@ import { Locator, Page } from "@playwright/test";
 
 export class TenantLoginPage {
   readonly page: Page;
-  readonly companyDomainInput: Locator;
+  readonly emailInput: Locator;
   readonly passwordInput: Locator;
   readonly loginButton: Locator;
   readonly errorMessage: Locator;
@@ -12,7 +12,7 @@ export class TenantLoginPage {
     this.page = page;
 
     // Locators based on labels, placeholders, role, and text content
-    this.companyDomainInput = page.getByPlaceholder("e.g. company-a");
+    this.emailInput = page.getByPlaceholder("user@company.com");
     this.passwordInput = page.getByPlaceholder("••••••••");
     this.loginButton = page.getByRole("button", { name: /Login to Workspace|Verifying.../i });
     this.errorMessage = page.locator(".text-red-500");
@@ -24,8 +24,8 @@ export class TenantLoginPage {
     await this.page.goto("/"); 
   }
 
-  async login(companyDomain: string, password: string) {
-    await this.companyDomainInput.fill(companyDomain);
+  async login(email: string, password: string) {
+    await this.emailInput.fill(email);
     await this.passwordInput.fill(password);
     await this.loginButton.click();
   }
