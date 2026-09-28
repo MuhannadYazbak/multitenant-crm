@@ -30,6 +30,8 @@ import VehicleModal from "@/app/components/VehicleWindow";
 import PropertyModal from "@/app/components/PropertyWindow";
 import EvidenceModal from "@/app/components/EvidenceWindow";
 import WitnessModal from "@/app/components/WitnessWindow";
+import { apiFetch } from "@/app/lib/api";
+import { PermissionGate } from "@/app/components/PermissionGate";
 
 export default function ClientDetailPage() {
     const params = useParams();
@@ -142,24 +144,19 @@ export default function ClientDetailPage() {
 
     const handleSave = async (e: React.FormEvent) => {
         e.preventDefault();
+        if (!client?.id) return;
         setSaving(true);
 
         try {
-            const response = await fetch(`${API_BASE_URL}/api/clients/${client?.id}`, {
+            // apiFetch automatically handles base URL, Authorization header, and JSON parsing
+            const updatedClient = await apiFetch<Client>(`/api/clients/${client.id}/`, {
                 method: "PUT",
                 headers: {
-                    "Content-Type": "application/json",
                     "X-Tenant": tenant,
                 },
                 body: JSON.stringify(editForm),
             });
 
-            if (!response.ok) {
-                const errorData = await response.json();
-                throw new Error(errorData.detail || "Failed to update client.");
-            }
-
-            const updatedClient = await response.json();
             setClient(updatedClient);
             setIsEditing(false);
         } catch (err: any) {
@@ -169,7 +166,6 @@ export default function ClientDetailPage() {
             setSaving(false);
         }
     };
-
     const handleAddCustomField = () => {
         if (!newFieldKey.trim()) return;
 
@@ -299,12 +295,14 @@ export default function ClientDetailPage() {
                     </button>
 
                     {client && (
-                        <button
-                            onClick={() => setIsEditing(!isEditing)}
-                            className="bg-amber-500 hover:bg-amber-600 text-white px-3 py-1.5 rounded text-sm font-medium transition"
-                        >
-                            {isEditing ? "Cancel" : "✏️ Edit Client"}
-                        </button>
+                        <PermissionGate permission="clients:write">
+                            <button
+                                onClick={() => setIsEditing(!isEditing)}
+                                className="bg-amber-500 hover:bg-amber-600 text-white px-3 py-1.5 rounded text-sm font-medium transition"
+                            >
+                                {isEditing ? "Cancel" : "✏️ Edit Client"}
+                            </button>
+                        </PermissionGate>
                     )}
                 </div>
 
@@ -469,8 +467,8 @@ export default function ClientDetailPage() {
                                             <button
                                                 onClick={() => setActiveTab("policies")}
                                                 className={`pb-2 px-3 border-b-2 transition ${activeTab === "policies"
-                                                        ? "border-blue-600 text-blue-600 font-semibold"
-                                                        : "border-transparent text-gray-500 hover:text-gray-700"
+                                                    ? "border-blue-600 text-blue-600 font-semibold"
+                                                    : "border-transparent text-gray-500 hover:text-gray-700"
                                                     }`}
                                             >
                                                 📋 Policies
@@ -478,8 +476,8 @@ export default function ClientDetailPage() {
                                             <button
                                                 onClick={() => setActiveTab("vehicles")}
                                                 className={`pb-2 px-3 border-b-2 transition ${activeTab === "vehicles"
-                                                        ? "border-blue-600 text-blue-600 font-semibold"
-                                                        : "border-transparent text-gray-500 hover:text-gray-700"
+                                                    ? "border-blue-600 text-blue-600 font-semibold"
+                                                    : "border-transparent text-gray-500 hover:text-gray-700"
                                                     }`}
                                             >
                                                 🚗 Vehicles ({vehicles.length})
@@ -487,8 +485,8 @@ export default function ClientDetailPage() {
                                             <button
                                                 onClick={() => setActiveTab("properties")}
                                                 className={`pb-2 px-3 border-b-2 transition ${activeTab === "properties"
-                                                        ? "border-blue-600 text-blue-600 font-semibold"
-                                                        : "border-transparent text-gray-500 hover:text-gray-700"
+                                                    ? "border-blue-600 text-blue-600 font-semibold"
+                                                    : "border-transparent text-gray-500 hover:text-gray-700"
                                                     }`}
                                             >
                                                 🏠 Properties ({properties.length})
@@ -501,8 +499,8 @@ export default function ClientDetailPage() {
                                             <button
                                                 onClick={() => setActiveTab("cases")}
                                                 className={`pb-2 px-3 border-b-2 transition ${activeTab === "cases"
-                                                        ? "border-blue-600 text-blue-600 font-semibold"
-                                                        : "border-transparent text-gray-500 hover:text-gray-700"
+                                                    ? "border-blue-600 text-blue-600 font-semibold"
+                                                    : "border-transparent text-gray-500 hover:text-gray-700"
                                                     }`}
                                             >
                                                 ⚖️ Legal Cases
@@ -510,8 +508,8 @@ export default function ClientDetailPage() {
                                             <button
                                                 onClick={() => setActiveTab("evidence")}
                                                 className={`pb-2 px-3 border-b-2 transition ${activeTab === "evidence"
-                                                        ? "border-blue-600 text-blue-600 font-semibold"
-                                                        : "border-transparent text-gray-500 hover:text-gray-700"
+                                                    ? "border-blue-600 text-blue-600 font-semibold"
+                                                    : "border-transparent text-gray-500 hover:text-gray-700"
                                                     }`}
                                             >
                                                 📁 Evidence ({evidences.length})
@@ -519,8 +517,8 @@ export default function ClientDetailPage() {
                                             <button
                                                 onClick={() => setActiveTab("witnesses")}
                                                 className={`pb-2 px-3 border-b-2 transition ${activeTab === "witnesses"
-                                                        ? "border-blue-600 text-blue-600 font-semibold"
-                                                        : "border-transparent text-gray-500 hover:text-gray-700"
+                                                    ? "border-blue-600 text-blue-600 font-semibold"
+                                                    : "border-transparent text-gray-500 hover:text-gray-700"
                                                     }`}
                                             >
                                                 👥 Witnesses ({witnesses.length})
@@ -531,8 +529,8 @@ export default function ClientDetailPage() {
                                     <button
                                         onClick={() => setActiveTab("activity")}
                                         className={`pb-2 px-3 border-b-2 transition ${activeTab === "activity"
-                                                ? "border-blue-600 text-blue-600 font-semibold"
-                                                : "border-transparent text-gray-500 hover:text-gray-700"
+                                            ? "border-blue-600 text-blue-600 font-semibold"
+                                            : "border-transparent text-gray-500 hover:text-gray-700"
                                             }`}
                                     >
                                         📁 Notes & Billing
