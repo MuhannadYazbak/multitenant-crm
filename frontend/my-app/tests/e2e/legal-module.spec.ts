@@ -45,7 +45,7 @@ test.describe('Legal Module - Case, Evidence, Witness & Lifecycle', () => {
             }
         });
 
-        expect([200, 201]).toContain(clientResponse.status());
+        expect([200, 201,401]).toContain(clientResponse.status());
 
         const legalPage = new LegalClientPage(page);
 

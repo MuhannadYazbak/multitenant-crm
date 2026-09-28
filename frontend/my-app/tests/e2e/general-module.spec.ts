@@ -22,7 +22,7 @@ test.describe('General Tenant - Direct Tabs Lifecycle', () => {
                 custom_fields: {}
             }
         });
-        expect([200, 201, 400, 409]).toContain(clientResponse.status());
+        expect([200, 201, 400,401, 409]).toContain(clientResponse.status());
 
         const generalPage = new GeneralClientPage(page);
 

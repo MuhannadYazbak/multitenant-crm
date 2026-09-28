@@ -9,7 +9,7 @@ export class AdminLoginPage {
 
   constructor(page: Page) {
     this.page = page;
-    this.usernameInput = page.locator('input[placeholder="e.g. admin"]');
+    this.usernameInput = page.locator('input[placeholder="admin@company.com"]');
     this.passwordInput = page.locator('input[placeholder="••••••••"]');
     this.submitButton = page.locator('button[type="submit"]');
   }

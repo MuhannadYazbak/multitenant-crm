@@ -1,12 +1,17 @@
+# tabs_manager.py
 import os
 import shutil
 from typing import List
-from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form, status
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form, Request, status
 from sqlalchemy.orm import Session
 
 import models
 import schemas
 from database import get_db_for_tenant
+from models import User
+from auth_utils import get_current_user
+from rbac import require_permission
+from audit import log_activity
 
 router = APIRouter(
     prefix="/api/tabs",
@@ -52,8 +57,17 @@ def resolve_entity_context(entity_type: str, entity_id: int, db: Session):
 # 1. NOTES TAB
 # ==========================================
 
-@router.get("/{entity_type}/{entity_id}/notes", response_model=List[schemas.NoteResponse])
-def get_entity_notes(entity_type: str, entity_id: int, db: Session = Depends(get_db_for_tenant)):
+@router.get(
+    "/{entity_type}/{entity_id}/notes", 
+    response_model=List[schemas.NoteResponse],
+    dependencies=[Depends(require_permission("notes:read"))]
+)
+def get_entity_notes(
+    entity_type: str,
+    entity_id: int,
+    db: Session = Depends(get_db_for_tenant),
+    current_user: User = Depends(get_current_user)
+):
     resolve_entity_context(entity_type, entity_id, db)
     query = db.query(models.Note)
 
@@ -67,15 +81,27 @@ def get_entity_notes(entity_type: str, entity_id: int, db: Session = Depends(get
     return query.order_by(models.Note.is_pinned.desc(), models.Note.created_at.desc()).all()
 
 
-@router.post("/{entity_type}/{entity_id}/notes", response_model=schemas.NoteResponse, status_code=status.HTTP_201_CREATED)
-def create_entity_note(entity_type: str, entity_id: int, payload: schemas.NoteCreate, db: Session = Depends(get_db_for_tenant)):
+@router.post(
+    "/{entity_type}/{entity_id}/notes", 
+    response_model=schemas.NoteResponse, 
+    status_code=status.HTTP_201_CREATED,
+    dependencies=[Depends(require_permission("notes:write"))]
+)
+def create_entity_note(
+    entity_type: str,
+    entity_id: int,
+    payload: schemas.NoteCreate,
+    request: Request,
+    db: Session = Depends(get_db_for_tenant),
+    current_user: User = Depends(get_current_user)
+):
     ctx = resolve_entity_context(entity_type, entity_id, db)
 
     note_kwargs = {
         "client_id": ctx["client_id"],
         "case_id": ctx["case_id"],
         "policy_id": ctx["policy_id"],
-        "author_name": payload.author_name or "System User",
+        "author_name": payload.author_name or getattr(current_user, "email", "System User"),
         "note_type": payload.note_type or "General",
         "content": payload.content,
         "is_pinned": payload.is_pinned or False
@@ -85,22 +111,55 @@ def create_entity_note(entity_type: str, entity_id: int, payload: schemas.NoteCr
 
     new_note = models.Note(**filtered_kwargs)
     db.add(new_note)
-    db.flush()  # Populate ID & created_at timestamp
-    
-    # Load pydantic data into memory before committing session
-    response_data = schemas.NoteResponse.model_validate(new_note)
+    db.flush()
+
+    log_activity(
+        db=db,
+        action="NOTE_CREATED",
+        resource="notes",
+        tenant_id=current_user.tenant_id,
+        user_id=current_user.id,
+        user_email=current_user.email,
+        details={"note_id": new_note.id, "entity_type": entity_type, "entity_id": entity_id},
+        request=request
+    )
+
     db.commit()
-    return response_data
+    db.refresh(new_note)
+    return new_note
 
 
-@router.delete("/{entity_type}/{entity_id}/notes/{note_id}", status_code=status.HTTP_204_NO_CONTENT)
-def delete_entity_note(entity_type: str, entity_id: int, note_id: int, db: Session = Depends(get_db_for_tenant)):
+@router.delete(
+    "/{entity_type}/{entity_id}/notes/{note_id}", 
+    status_code=status.HTTP_204_NO_CONTENT,
+    dependencies=[Depends(require_permission("notes:delete"))]
+)
+def delete_entity_note(
+    entity_type: str,
+    entity_id: int,
+    note_id: int,
+    request: Request,
+    db: Session = Depends(get_db_for_tenant),
+    current_user: User = Depends(get_current_user)
+):
     resolve_entity_context(entity_type, entity_id, db)
     note = db.query(models.Note).filter(models.Note.id == note_id).first()
     if not note:
         raise HTTPException(status_code=404, detail="Note not found")
 
     db.delete(note)
+
+    log_activity(
+        db=db,
+        action="NOTE_DELETED",
+        resource="notes",
+        tenant_id=current_user.tenant_id,
+        user_id=current_user.id,
+        user_email=current_user.email,
+        details={"note_id": note_id, "entity_type": entity_type, "entity_id": entity_id},
+        request=request
+    )
+
     db.commit()
     return None
 
@@ -109,8 +168,18 @@ def delete_entity_note(entity_type: str, entity_id: int, note_id: int, db: Sessi
 # 2. DOCUMENTS TAB
 # ==========================================
 
-@router.get("/{entity_type}/{entity_id}/documents", response_model=List[schemas.DocumentResponse])
-def get_entity_documents(entity_type: str, entity_id: int, show_archived: bool = False, db: Session = Depends(get_db_for_tenant)):
+@router.get(
+    "/{entity_type}/{entity_id}/documents", 
+    response_model=List[schemas.DocumentResponse],
+    dependencies=[Depends(require_permission("documents:read"))]
+)
+def get_entity_documents(
+    entity_type: str,
+    entity_id: int,
+    show_archived: bool = False,
+    db: Session = Depends(get_db_for_tenant),
+    current_user: User = Depends(get_current_user)
+):
     resolve_entity_context(entity_type, entity_id, db)
     query = db.query(models.Document).filter(models.Document.is_archived == show_archived)
 
@@ -124,13 +193,20 @@ def get_entity_documents(entity_type: str, entity_id: int, show_archived: bool =
     return query.order_by(models.Document.uploaded_at.desc()).all()
 
 
-@router.post("/{entity_type}/{entity_id}/documents", response_model=schemas.DocumentResponse, status_code=status.HTTP_201_CREATED)
+@router.post(
+    "/{entity_type}/{entity_id}/documents", 
+    response_model=schemas.DocumentResponse, 
+    status_code=status.HTTP_201_CREATED,
+    dependencies=[Depends(require_permission("documents:write"))]
+)
 def upload_entity_document(
     entity_type: str,
     entity_id: int,
+    request: Request,
     file_category: str = Form("General"),
     file: UploadFile = File(...),
-    db: Session = Depends(get_db_for_tenant)
+    db: Session = Depends(get_db_for_tenant),
+    current_user: User = Depends(get_current_user)
 ):
     ctx = resolve_entity_context(entity_type, entity_id, db)
     tenant_slug = db.info.get("tenant_slug", "default_tenant")
@@ -157,34 +233,75 @@ def upload_entity_document(
 
     doc = models.Document(**filtered_kwargs)
     db.add(doc)
-    db.flush()  # Populate ID and uploaded_at timestamp
-    
-    # Load pydantic data into memory before committing session
-    response_data = schemas.DocumentResponse.model_validate(doc)
+    db.flush()
+
+    log_activity(
+        db=db,
+        action="DOCUMENT_UPLOADED",
+        resource="documents",
+        tenant_id=current_user.tenant_id,
+        user_id=current_user.id,
+        user_email=current_user.email,
+        details={"doc_id": doc.id, "file_name": file.filename, "file_category": file_category},
+        request=request
+    )
+
     db.commit()
-    return response_data
+    db.refresh(doc)
+    return doc
 
 
-@router.put("/{entity_type}/{entity_id}/documents/{document_id}/archive", response_model=schemas.DocumentResponse)
-def archive_entity_document(entity_type: str, entity_id: int, document_id: int, db: Session = Depends(get_db_for_tenant)):
+@router.put(
+    "/{entity_type}/{entity_id}/documents/{document_id}/archive", 
+    response_model=schemas.DocumentResponse,
+    dependencies=[Depends(require_permission("documents:write"))]
+)
+def archive_entity_document(
+    entity_type: str,
+    entity_id: int,
+    document_id: int,
+    request: Request,
+    db: Session = Depends(get_db_for_tenant),
+    current_user: User = Depends(get_current_user)
+):
     resolve_entity_context(entity_type, entity_id, db)
     doc = db.query(models.Document).filter(models.Document.id == document_id).first()
     if not doc:
         raise HTTPException(status_code=404, detail="Document not found")
 
     doc.is_archived = True
-    db.flush()
-    response_data = schemas.DocumentResponse.model_validate(doc)
+
+    log_activity(
+        db=db,
+        action="DOCUMENT_ARCHIVED",
+        resource="documents",
+        tenant_id=current_user.tenant_id,
+        user_id=current_user.id,
+        user_email=current_user.email,
+        details={"document_id": document_id, "file_name": doc.file_name},
+        request=request
+    )
+
     db.commit()
-    return response_data
+    db.refresh(doc)
+    return doc
 
 
 # ==========================================
 # 3. BILLING TAB
 # ==========================================
 
-@router.get("/{entity_type}/{entity_id}/billing", response_model=List[schemas.BillingEntryResponse])
-def get_entity_billing_entries(entity_type: str, entity_id: int, db: Session = Depends(get_db_for_tenant)):
+@router.get(
+    "/{entity_type}/{entity_id}/billing", 
+    response_model=List[schemas.BillingEntryResponse],
+    dependencies=[Depends(require_permission("billing:read"))]
+)
+def get_entity_billing_entries(
+    entity_type: str,
+    entity_id: int,
+    db: Session = Depends(get_db_for_tenant),
+    current_user: User = Depends(get_current_user)
+):
     resolve_entity_context(entity_type, entity_id, db)
     query = db.query(models.BillingEntry)
 
@@ -198,8 +315,20 @@ def get_entity_billing_entries(entity_type: str, entity_id: int, db: Session = D
     return query.order_by(models.BillingEntry.created_at.desc()).all()
 
 
-@router.post("/{entity_type}/{entity_id}/billing", response_model=schemas.BillingEntryResponse, status_code=status.HTTP_201_CREATED)
-def create_entity_billing_entry(entity_type: str, entity_id: int, billing_data: schemas.BillingEntryCreate, db: Session = Depends(get_db_for_tenant)):
+@router.post(
+    "/{entity_type}/{entity_id}/billing", 
+    response_model=schemas.BillingEntryResponse, 
+    status_code=status.HTTP_201_CREATED,
+    dependencies=[Depends(require_permission("billing:write"))]
+)
+def create_entity_billing_entry(
+    entity_type: str,
+    entity_id: int,
+    billing_data: schemas.BillingEntryCreate,
+    request: Request,
+    db: Session = Depends(get_db_for_tenant),
+    current_user: User = Depends(get_current_user)
+):
     context = resolve_entity_context(entity_type, entity_id, db)
 
     dumped = billing_data.model_dump(exclude_unset=True) if hasattr(billing_data, "model_dump") else billing_data.dict()
@@ -219,19 +348,53 @@ def create_entity_billing_entry(entity_type: str, entity_id: int, billing_data: 
     entry = models.BillingEntry(**filtered_kwargs)
     db.add(entry)
     db.flush()
-    
-    response_data = schemas.BillingEntryResponse.model_validate(entry)
+
+    log_activity(
+        db=db,
+        action="BILLING_ENTRY_CREATED",
+        resource="billing_entries",
+        tenant_id=current_user.tenant_id,
+        user_id=current_user.id,
+        user_email=current_user.email,
+        details={"billing_id": entry.id, "total_amount": float(getattr(entry, "total_amount", 0.0))},
+        request=request
+    )
+
     db.commit()
-    return response_data
+    db.refresh(entry)
+    return entry
 
 
-@router.delete("/{entity_type}/{entity_id}/billing/{billing_id}", status_code=status.HTTP_204_NO_CONTENT)
-def delete_entity_billing_entry(entity_type: str, entity_id: int, billing_id: int, db: Session = Depends(get_db_for_tenant)):
+@router.delete(
+    "/{entity_type}/{entity_id}/billing/{billing_id}", 
+    status_code=status.HTTP_204_NO_CONTENT,
+    dependencies=[Depends(require_permission("billing:delete"))]
+)
+def delete_entity_billing_entry(
+    entity_type: str,
+    entity_id: int,
+    billing_id: int,
+    request: Request,
+    db: Session = Depends(get_db_for_tenant),
+    current_user: User = Depends(get_current_user)
+):
     resolve_entity_context(entity_type, entity_id, db)
     entry = db.query(models.BillingEntry).filter(models.BillingEntry.id == billing_id).first()
     if not entry:
         raise HTTPException(status_code=404, detail="Billing entry not found")
 
     db.delete(entry)
+
+    log_activity(
+        db=db,
+        action="BILLING_ENTRY_DELETED",
+        resource="billing_entries",
+        tenant_id=current_user.tenant_id,
+        user_id=current_user.id,
+        user_email=current_user.email,
+        details={"billing_id": billing_id, "entity_type": entity_type, "entity_id": entity_id},
+        request=request
+    )
+
     db.commit()
     return None

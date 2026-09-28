@@ -19,7 +19,7 @@ test.describe("Admin System Lifecycle Suite", () => {
 
     // 1. Log in as superadmin
     await adminLogin.goto();
-    await adminLogin.login("admin", "NewAdminSecret456!");
+    await adminLogin.login("admin@example.com", "AdminSecret123456!");
     await expect(page).toHaveURL("/admin/dashboard");
   });
 

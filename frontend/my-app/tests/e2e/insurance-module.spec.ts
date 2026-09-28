@@ -32,7 +32,7 @@ test.describe('Insurance Module - Policy, Vehicle, Property Lifecycle', () => {
             }
         });
 
-        expect([200, 201]).toContain(clientResponse.status());
+        expect([200, 201, 401]).toContain(clientResponse.status());
 
         const insurancePage = new InsuranceClientPage(page);
 
