@@ -267,7 +267,7 @@ SET row_security = off;
 -- Data for Name: admins; Type: TABLE DATA; Schema: public; Owner: postgres
 --
 
-INSERT INTO public.admins (username, password_hash, created_at) VALUES ('admin', '$2b$12$I.8Fsv7v2jbsw313lx6/KuVdXsuVjs/Fx1/xyuqJEUxHOdtrqZ.zW', '2026-07-23 09:24:17.454665+00');
+-- INSERT INTO public.admins (username, password_hash, created_at) VALUES ('admin', '$2b$12$I.8Fsv7v2jbsw313lx6/KuVdXsuVjs/Fx1/xyuqJEUxHOdtrqZ.zW', '2026-07-23 09:24:17.454665+00');
 
 
 --
