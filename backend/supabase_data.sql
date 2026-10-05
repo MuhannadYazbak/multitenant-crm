@@ -290,7 +290,8 @@ INSERT INTO public.users (id, tenant_id, email, password_hash, full_name, is_act
 INSERT INTO public.users (id, tenant_id, email, password_hash, full_name, is_active, created_at, last_active) VALUES (3, 3, 'john.doe@acme.com', '$2b$12$kQ3iFBcMfp/TNVmxw1bGEOL2Xqe.jECsoQBranXEPJlX0Ci36FYPa', 'John Doe', true, '2026-09-09 09:42:53.830779+00', '2026-09-27 11:38:27.741869+00');
 INSERT INTO public.users (id, tenant_id, email, password_hash, full_name, is_active, created_at, last_active) VALUES (6, 7, 'manager@yazbak.com', '$2b$12$619vRWFEbRYCd9nGiD/RTu5H1TthERZweo62YVYHr0rj7HlC6qTP6', 'yazbak Manager', true, '2026-09-14 09:49:09.338459+00', '2026-09-28 09:26:43.707149+00');
 INSERT INTO public.users (id, tenant_id, email, password_hash, full_name, is_active, created_at, last_active) VALUES (8, 7, 'yazbakm@gmail.com', '$2b$12$hffhE688a2q3RE1KZ6dHYu9zCv0JbWM7UOXNIhO7uJLVW.szQNNdq', 'Muhannad Yazbak', true, '2026-09-24 09:51:10.468363+00', '2026-09-28 11:25:40.129417+00');
-
+INSERT INTO public.users (id, tenant_id, email, password_hash, full_name, is_active, created_at, last_active) VALUES (9, 1, 'manager@insurance.com', '$2b$12$619vRWFEbRYCd9nGiD/RTu5H1TthERZweo62YVYHr0rj7HlC6qTP6', 'Insurance Manager', true, NULL, NULL);
+INSERT INTO public.users (id, tenant_id, email, password_hash, full_name, is_active, created_at, last_active) VALUES (10, 3, 'manager@legal.com', '$2b$12$619vRWFEbRYCd9nGiD/RTu5H1TthERZweo62YVYHr0rj7HlC6qTP6', 'Legal Manager', true, NULL, NULL);
 
 --
 -- Data for Name: audit_logs; Type: TABLE DATA; Schema: public; Owner: postgres
@@ -391,7 +392,8 @@ INSERT INTO public.user_roles (id, user_id, role_id) VALUES (3, 3, 2);
 INSERT INTO public.user_roles (id, user_id, role_id) VALUES (4, 6, 2);
 INSERT INTO public.user_roles (id, user_id, role_id) VALUES (7, 7, 3);
 INSERT INTO public.user_roles (id, user_id, role_id) VALUES (8, 8, 5);
-
+INSERT INTO public.user_roles (id, user_id, role_id) VALUES (9, 9, 2);
+INSERT INTO public.user_roles (id, user_id, role_id) VALUES (10, 10, 2);
 
 --
 -- Data for Name: vehicles; Type: TABLE DATA; Schema: public; Owner: postgres
