@@ -127,6 +127,7 @@ function LoginForm() {
         <button
           suppressHydrationWarning
           type="submit"
+          id="SignIn"
           disabled={loading}
           className={`p-2.5 rounded font-bold text-white text-sm transition ${
             loading

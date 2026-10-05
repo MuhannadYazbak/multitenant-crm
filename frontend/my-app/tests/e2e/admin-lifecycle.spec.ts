@@ -19,14 +19,14 @@ test.describe("Admin System Lifecycle Suite", () => {
 
     // 1. Log in as superadmin
     await adminLogin.goto();
-    await adminLogin.login("admin@example.com", "AdminSecret123456!");
+    await adminLogin.login("admin@example.com", "Admin123456!");
     await expect(page).toHaveURL("/admin/dashboard");
   });
 
   test("should provision a new tenant and manage lifecycle status", async () => {
     // 2. Provision new workspace
     await adminDashboard.provisionTenant(testTenant.name, testTenant.pass, testTenant.type);
-
+    //await adminDashboard.page.reload();
     // 3. Verify workspace created in ACTIVE state
     await adminDashboard.verifyTenantStatus(testTenant.name, "ACTIVE");
 

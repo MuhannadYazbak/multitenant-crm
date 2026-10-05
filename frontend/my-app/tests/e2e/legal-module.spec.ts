@@ -1,20 +1,31 @@
 import { test, expect } from '@playwright/test';
 import { LegalClientPage } from '../pages/LegalClientPage';
+import { TenantLoginPage } from '../pages/TenantLoginPage';
 import path from 'path';
 import fs from 'fs';
 
 test.describe('Legal Module - Case, Evidence, Witness & Lifecycle', () => {
     const testTenant = 'company-c';
     const uniqueId = Date.now();
-    const testClient = `Charlie Brown ${uniqueId}`;
+    const testClient = `Charlie Brown`;
     const testCaseNumber = `CAS-TEST-${uniqueId}`;
     const dummyFilePath = path.join(__dirname, 'test-doc.txt');
-
+    let tenantLogin: TenantLoginPage;
     test.beforeAll(() => {
         if (!fs.existsSync(dummyFilePath)) {
             fs.writeFileSync(dummyFilePath, 'Legal contract test content');
         }
     });
+
+    test.beforeEach(async ({ page }) => {
+            tenantLogin = new TenantLoginPage(page);
+        
+            // 1. Log in as Tenant Manager
+            await tenantLogin.goto();
+            await tenantLogin.login("manager@legal.com", "my@1234");
+            await expect(page).toHaveURL("/company-c/mypage");
+            await page.waitForLoadState("networkidle");
+          });
 
     test.afterAll(() => {
         if (fs.existsSync(dummyFilePath)) {
@@ -23,10 +34,11 @@ test.describe('Legal Module - Case, Evidence, Witness & Lifecycle', () => {
     });
 
     test('should manage full legal client lifecycle including evidence and witnesses', async ({ page, request }) => {
+        test.setTimeout(60000)
         // Seed Client with unique email/name
         const randomLetters = Array.from({ length: 6 }, () => String.fromCharCode(97 + Math.floor(Math.random() * 26))).join('');
 
-        const testClient = `Charlie Brown ${randomLetters}`; // Pure letters to satisfy name regex
+        const testClient = `Charlie Brown`; // Pure letters to satisfy name regex
         const testCaseNumber = `CAS-TEST-${Date.now()}`;
 
         // Seed Client

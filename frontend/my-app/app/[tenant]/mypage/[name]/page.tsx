@@ -306,7 +306,7 @@ export default function ClientDetailPage() {
                     )}
                 </div>
 
-                <h1 className="text-2xl font-bold text-slate-800">Client Profile</h1>
+                <h1 id='clientProfile' className="text-2xl font-bold text-slate-800">Client Profile</h1>
 
                 {loading ? (
                     <p className="text-gray-500">Loading profile details...</p>
@@ -326,7 +326,7 @@ export default function ClientDetailPage() {
                                         src="https://img.magnific.com/free-vector/blue-circle-with-white-user_78370-4707.jpg?semt=ais_hybrid&w=740&q=80"
                                         className="w-20 h-20 rounded-full"
                                     />
-                                    <h2 className="text-xl font-bold text-gray-800">{client.name}</h2>
+                                    <h2 id='clientName' className="text-xl font-bold text-gray-800">{client.name}</h2>
                                     <div className="w-full space-y-2 text-sm text-gray-700 pt-2 border-t">
                                         <p><strong>Phone:</strong> {client.phone}</p>
                                         <p><strong>Email:</strong> {client.email}</p>

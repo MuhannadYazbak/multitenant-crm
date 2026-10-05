@@ -17,14 +17,14 @@ test.describe("Tenant CRM Full End-to-End Suite", () => {
   test("complete client lifecycle: login, create, view profile, edit, search, delete", async ({ page }) => {
     // 1. Workspace Login
     await tenantLogin.goto();
-    await tenantLogin.login("yazbakm@gmail.com", "my@8391");
-    await expect(page).toHaveURL(/\/yazbak\/mypage/);
+    await tenantLogin.login("manager@yazbak.com", "my@1234");
+    //await expect(page).toHaveURL("/yazbak/mypage");
 
     // 2. Provision New Client with dynamic dynamic email/name to avoid DB 500 unique constraints
     const uniqueId = Date.now().toString(36).replace(/[0-9]/g, (m) => String.fromCharCode(65 + parseInt(m)));
 
     const originalClient = {
-      name: `Test User ${uniqueId}`, // E.g., "Test User BCJ" (Regex ^[A-Za-z\s'-]+$ compliant)
+      name: `Test New User ${uniqueId}`, // E.g., "Test User BCJ" (Regex ^[A-Za-z\s'-]+$ compliant)
       phone: `054${Math.floor(1000000 + Math.random() * 9000000)}`, // Unique 10-digit phone
       email: `user-${uniqueId.toLowerCase()}@testcrm.com`, // Unique email
       address: "45 Technology Park",

@@ -1,9 +1,20 @@
 import { test, expect } from '@playwright/test';
 import { GeneralClientPage } from '../pages/GeneralClientPage';
+import { TenantLoginPage } from '../pages/TenantLoginPage';
 
 test.describe('General Tenant - Direct Tabs Lifecycle', () => {
-    const testTenant = 'company-b';
-    const testClient = 'Bob Jones';
+    const testTenant = 'yazbak';
+    const testClient = 'New User';
+    let tenantLogin: TenantLoginPage;
+    let generalPage: GeneralClientPage;
+    test.beforeEach(async ({ page }) => {
+        tenantLogin = new TenantLoginPage(page);
+    
+        // 1. Log in as Tenant Manager
+        await tenantLogin.goto();
+        await tenantLogin.login("manager@yazbak.com", "my@1234");
+        await expect(page).toHaveURL("/yazbak/mypage");
+      });
 
     test('should manage notes directly on client level without drawers', async ({ page, request }) => {
         // Seed Client
@@ -15,16 +26,16 @@ test.describe('General Tenant - Direct Tabs Lifecycle', () => {
             data: {
                 name: testClient,
                 full_name: testClient,
-                email: 'bob@example.com',
-                phone: '0505554433',
-                address: 'Tel Aviv, Israel',
+                email: 'newuser@yazbakm.com',
+                phone: '0501203201',
+                address: 'Unknown',
                 status: 'active',
                 custom_fields: {}
             }
         });
         expect([200, 201, 400,401, 409]).toContain(clientResponse.status());
 
-        const generalPage = new GeneralClientPage(page);
+        generalPage = new GeneralClientPage(page);
 
         // 1. Navigate
         await generalPage.goto(testTenant, testClient);

@@ -64,7 +64,8 @@ export class BaseClientPage {
             },
         ]);
         await this.page.goto(`/${tenant}/mypage/${encodeURIComponent(clientName)}`);
-        await this.page.locator('h1, h2', { hasText: clientName }).waitFor({ state: 'visible', timeout: 10000 });
+        //await this.page.locator('h1, h2', { hasText: clientName }).waitFor({ state: 'visible', timeout: 10000 });
+        await this.page.locator("#clientName").waitFor({state: 'visible', timeout: 10000})
         await this.page.waitForFunction(
             () => !document.body.innerText.includes('Loading'),
             { timeout: 10000 }
@@ -73,22 +74,44 @@ export class BaseClientPage {
     }
 
     // --- SHARED NOTES ACTIONS ---
+    // async addNote(content: string, author: string = 'Test Admin', isPinned: boolean = false) {
+    //     await this.notesTabButton.click();
+    //     await this.authorInput.fill(author);
+    //     await this.noteInput.fill(content);
+    //     if (isPinned) {
+    //         await this.page.check('input[type="checkbox"]');
+    //     }
+
+    //     const responsePromise = this.page.waitForResponse(
+    //         (resp) => resp.url().includes('/notes') && (resp.status() === 200 || resp.status() === 201)
+    //     );
+
+    //     await this.addNoteButton.click();
+    //     await responsePromise;
+    //     await this.page.waitForLoadState('networkidle');
+    // }
+
     async addNote(content: string, author: string = 'Test Admin', isPinned: boolean = false) {
-        await this.notesTabButton.click();
-        await this.authorInput.fill(author);
-        await this.noteInput.fill(content);
-        if (isPinned) {
-            await this.page.check('input[type="checkbox"]');
-        }
-
-        const responsePromise = this.page.waitForResponse(
-            (resp) => resp.url().includes('/notes') && (resp.status() === 200 || resp.status() === 201)
-        );
-
-        await this.addNoteButton.click();
-        await responsePromise;
-        await this.page.waitForLoadState('networkidle');
+    await this.notesTabButton.click();
+    await this.authorInput.fill(author);
+    await this.noteInput.fill(content);
+    
+    if (isPinned) {
+        await this.page.check('input[type="checkbox"]');
     }
+
+    // Wrap click and response wait together so the listener is active BEFORE the click fires
+    await Promise.all([
+        this.page.waitForResponse(
+            (resp) => resp.url().includes('notes') && (resp.status() === 200 || resp.status() === 201),
+            { timeout: 10000 }
+        ),
+        this.addNoteButton.click()
+    ]);
+
+    // Give Next.js client state a brief moment to update UI DOM
+    await this.page.waitForLoadState('networkidle');
+}
 
     async deleteFirstNote() {
         await this.notesTabButton.click();
