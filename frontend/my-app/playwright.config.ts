@@ -5,7 +5,7 @@ export default defineConfig({
   retries: process.env.CI ? 2 : 0,
   testDir: "./tests",
   fullyParallel: false,
-  workers: process.env.CI ? 1 : undefined,
+  workers: process.env.CI ? 1 : 1,
   use: {
     // Explicit 127.0.0.1 avoids IPv6 localhost resolution hangs in Linux CI
     baseURL: "http://127.0.0.1:3000",

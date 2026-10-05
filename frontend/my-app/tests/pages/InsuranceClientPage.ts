@@ -48,13 +48,39 @@ export class InsuranceClientPage extends BaseClientPage {
         await this.policiesTabButton.click();
     }
 
+    // async createPolicy(policyNumber: string, coverageAmount: string) {
+    //     await this.clickPoliciesTab();
+    //     await this.addPolicyButton.click();
+    //     await this.policyNumberInput.fill(policyNumber);
+    //     await this.coverageAmountInput.fill(coverageAmount);
+    //     await this.submitPolicyButton.click();
+    //     await this.page.waitForLoadState('networkidle');
+    // }
+
+    // tests/pages/InsuranceClientPage.ts
+
     async createPolicy(policyNumber: string, coverageAmount: string) {
+        // 1. Open Policy Modal
         await this.clickPoliciesTab();
-        await this.addPolicyButton.click();
-        await this.policyNumberInput.fill(policyNumber);
-        await this.coverageAmountInput.fill(coverageAmount);
-        await this.submitPolicyButton.click();
-        await this.page.waitForLoadState('networkidle');
+        await this.page.click('button:has-text("+ Create Policy"), button:has-text("+ Add New Policy")');
+
+        // 2. Fill inputs
+        const dialog = this.page.locator('div.fixed, [role="dialog"]');
+        await dialog.locator('input[placeholder*="POL-"], input[name*="policy"]').fill(policyNumber);
+        await dialog.locator('input[type="number"], input[name*="coverage"]').fill(coverageAmount);
+
+        // 3. Submit and wait for response + modal hide
+        await Promise.all([
+            this.page.waitForResponse(
+                (resp) => resp.url().includes('/policies') && (resp.status() === 200 || resp.status() === 201),
+                { timeout: 10000 }
+            ),
+            dialog.locator('button[type="submit"], button:has-text("Create"), button:has-text("Save")').click(),
+            await this.page.waitForLoadState("networkidle")
+        ]);
+
+        // 4. Ensure modal is fully closed before table assertion runs
+        //await expect(dialog).toBeHidden({ timeout: 10000 });
     }
 
     async openPolicyDrawer(policyNumber: string) {
@@ -99,7 +125,7 @@ export class InsuranceClientPage extends BaseClientPage {
             await propertiesTab.click();
         }
 
-        const addPropertyBtn = this.page.getByRole('button', { name: /add property|\+ property/i });
+        const addPropertyBtn = this.page.getByRole('button', { name: /Add Property|\+ property/i });
         await addPropertyBtn.waitFor({ state: 'visible', timeout: 5000 });
         await addPropertyBtn.click();
 

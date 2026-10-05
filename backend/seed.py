@@ -1,264 +1,123 @@
-from database import engine, SessionLocal, Base
-import models
-from sqlalchemy import text
-from auth_utils import hash_password
+# import os
+# from database import engine, Base
+# from sqlalchemy import text
 
+# def reset_and_seed():
+#     Base.metadata.create_all(bind=engine)
+#     print("Resetting database schema...")
+#     with engine.connect() as conn:
+#         # 1. Clear existing schema
+#         conn.execute(text("DROP SCHEMA IF EXISTS public CASCADE;"))
+#         conn.execute(text("CREATE SCHEMA public;"))
+#         conn.commit()
+
+#         # 2. Execute SQL file while filtering out psql meta-commands (like \unrestrict or \set)
+#         data_path = os.path.join(os.path.dirname(__file__), "supabase_data.sql")
+#         # Or "supabase_schema.sql" depending on your filename
+        
+#         if os.path.exists(data_path):
+#             print(f"Reading {data_path}...")
+#             with open(data_path, "r", encoding="utf-8") as f:
+#                 lines = f.readlines()
+
+#             # Filter out lines starting with '\' (psql meta-commands)
+#             clean_sql = "\n".join(
+#                 [line for line in lines if not line.strip().startswith("\\")]
+#             )
+
+#             print("Executing SQL dump...")
+#             conn.execute(text(clean_sql))
+#             conn.commit()
+#             print("✅ Database successfully seeded!")
+#         else:
+#             print(f"❌ Could not find {data_path}")
+
+# if __name__ == "__main__":
+#     reset_and_seed()
+
+
+import os
+import sqlparse
+from sqlalchemy import text
+from database import engine, Base
 
 def reset_and_seed():
-    print("Dropping existing tenant schemas and resetting database...")
-    with engine.connect() as conn:
-        conn.execute(text("DROP SCHEMA IF EXISTS tenant_company_a CASCADE;"))
-        conn.execute(text("DROP SCHEMA IF EXISTS tenant_company_b CASCADE;"))
-        conn.execute(text("DROP SCHEMA IF EXISTS tenant_company_c CASCADE;"))
-        conn.execute(
-            text("DROP TABLE IF EXISTS public.tenant_accounts CASCADE;"))
+    # 🛑 GUARD 1: Prevent running on Supabase / Cloud URLs
+    DB_URL = str(engine.url)
+    print(f"Connecting to database host: {engine.url.host}:{engine.url.port}/{engine.url.database}")
+    
+    if "supabase.co" in DB_URL or "pooler.supabase.com" in DB_URL:
+        raise RuntimeError("🚨 SAFETY BLOCK TRIGGERED: Refusing to run reset_and_seed on a Supabase database!")
 
-        conn.execute(text("CREATE SCHEMA IF NOT EXISTS tenant_company_a;"))
-        conn.execute(text("CREATE SCHEMA IF NOT EXISTS tenant_company_b;"))
-        conn.execute(text("CREATE SCHEMA IF NOT EXISTS tenant_company_c;"))
-        conn.commit()
+    # 🛑 GUARD 2: Explicit Environment Check
+    env = os.getenv("ENV", "development").lower()
+    if env not in ["development", "test", "local"]:
+        raise RuntimeError(f"🚨 SAFETY BLOCK TRIGGERED: ENV must be 'development', 'test', or 'local' (currently '{env}').")
 
-    print("Creating public tenant tables...")
+    data_path = os.path.join(os.path.dirname(__file__), "supabase_data.sql")
+    if not os.path.exists(data_path):
+        print(f"❌ Could not find {data_path}")
+        return
+
+    print("🏗️ Ensuring database tables exist from SQLAlchemy Base metadata...")
     Base.metadata.create_all(bind=engine)
 
-    # 1. Provision Tables Strictly by Tenant Type
-    def provision_tenant_schema(schema_name: str, tenant_type: str):
-        with engine.connect() as conn:
-            conn.execute(text(f"SET search_path TO {schema_name};"))
+    print("🧹 Truncating existing tables for a clean seed state...")
+    with engine.connect() as conn:
+        trans = conn.begin()
+        try:
+            # Disable triggers/FKs temporarily while truncating
+            conn.execute(text("SET session_replication_role = 'replica';"))
+            for table in reversed(Base.metadata.sorted_tables):
+                conn.execute(text(f'TRUNCATE TABLE "{table.name}" RESTART IDENTITY CASCADE;'))
+            conn.execute(text("SET session_replication_role = 'origin';"))
+            trans.commit()
+            print("✨ Tables truncated successfully.")
+        except Exception as e:
+            trans.rollback()
+            print(f"⚠️ Truncate skipped or encountered error: {e}")
 
-            # ALL tenants get core clients table
-            conn.execute(text("""
-                CREATE TABLE IF NOT EXISTS clients (
-                    id SERIAL PRIMARY KEY,
-                    name VARCHAR(100) NOT NULL,
-                    phone VARCHAR(50) NOT NULL,
-                    email VARCHAR(100) NOT NULL,
-                    address VARCHAR(250),
-                    status VARCHAR(50) DEFAULT 'active',
-                    custom_fields JSONB DEFAULT '{}'::jsonb NOT NULL,
-                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-                );
-            """))
+    print(f"📖 Reading and parsing {data_path}...")
+    with open(data_path, "r", encoding="utf-8") as f:
+        content = f.read()
 
-            # Insurance Vertical
-            if tenant_type == "insurance":
-                conn.execute(text("""
-                    CREATE TABLE IF NOT EXISTS insurance_policies (
-                        id SERIAL PRIMARY KEY,
-                        client_id INT NOT NULL REFERENCES clients(id) ON DELETE CASCADE,
-                        policy_number VARCHAR(100) NOT NULL,
-                        policy_type VARCHAR(100) DEFAULT 'General',
-                        coverage_amount NUMERIC(12, 2),
-                        deductible NUMERIC(10, 2) DEFAULT 0.00,
-                        status VARCHAR(50) DEFAULT 'Active',
-                        start_date TIMESTAMP,
-                        end_date TIMESTAMP,
-                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-                    );
+    parsed_statements = sqlparse.split(content)
 
-                    CREATE TABLE IF NOT EXISTS vehicles (
-                        id VARCHAR PRIMARY KEY,
-                        client_id INT NOT NULL REFERENCES clients(id) ON DELETE CASCADE,
-                        manufacturer VARCHAR(100) NOT NULL,
-                        model VARCHAR(100) NOT NULL,
-                        year INT NOT NULL,
-                        plate_no VARCHAR(8) NOT NULL,
-                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-                    );
+    print("⚡ Executing seed statements...")
+    inserted_count = 0
+    error_count = 0
 
-                    CREATE TABLE IF NOT EXISTS properties (
-                        id VARCHAR PRIMARY KEY,
-                        client_id INT NOT NULL REFERENCES clients(id) ON DELETE CASCADE,
-                        property_type VARCHAR(100) NOT NULL,
-                        area FLOAT NOT NULL,
-                        address VARCHAR(255),
-                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-                    );
-                """))
-
-            # Legal Vertical
-            if tenant_type == "legal":
-                conn.execute(text("""
-                    CREATE TABLE IF NOT EXISTS legal_cases (
-                        id SERIAL PRIMARY KEY,
-                        client_id INT NOT NULL REFERENCES clients(id) ON DELETE CASCADE,
-                        case_number VARCHAR(100) NOT NULL,
-                        case_type VARCHAR(100) NOT NULL,
-                        court VARCHAR(255),
-                        status VARCHAR(50) DEFAULT 'Open',
-                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-                    );
-
-                    CREATE TABLE IF NOT EXISTS evidences (
-                        id VARCHAR PRIMARY KEY,
-                        client_id INT NOT NULL REFERENCES clients(id) ON DELETE CASCADE,
-                        evidence_type VARCHAR(100) NOT NULL,
-                        evidence_detail VARCHAR(100) NOT NULL,
-                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-                    );
-
-                    CREATE TABLE IF NOT EXISTS witnesses (
-                        id VARCHAR PRIMARY KEY,
-                        client_id INT NOT NULL REFERENCES clients(id) ON DELETE CASCADE,
-                        name VARCHAR(100) NOT NULL,
-                        age FLOAT NOT NULL,
-                        phone VARCHAR(10) NOT NULL,
-                        email VARCHAR(30) NOT NULL,
-                        address VARCHAR(255),
-                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-                    );
-                """))
-
-            # Universal Sub-Resources (All tenants get these with dynamic FKs)
-            case_fk = "REFERENCES legal_cases(id) ON DELETE CASCADE" if tenant_type == "legal" else ""
-            policy_fk = "REFERENCES insurance_policies(id) ON DELETE CASCADE" if tenant_type == "insurance" else ""
-
-            # Notes
-            conn.execute(text(f"""
-                CREATE TABLE IF NOT EXISTS notes (
-                    id SERIAL PRIMARY KEY,
-                    author_name VARCHAR(100) NOT NULL DEFAULT 'System User',
-                    note_type VARCHAR(50) DEFAULT 'General',
-                    content TEXT NOT NULL,
-                    is_pinned BOOLEAN DEFAULT FALSE,
-                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                    client_id INT REFERENCES clients(id) ON DELETE CASCADE,
-                    case_id INT {case_fk},
-                    policy_id INT {policy_fk}
-                );
-            """))
-
-            # Documents
-            conn.execute(text(f"""
-                CREATE TABLE IF NOT EXISTS documents (
-                    id SERIAL PRIMARY KEY,
-                    file_name VARCHAR(255) NOT NULL,
-                    file_path VARCHAR(500) NOT NULL,
-                    file_type VARCHAR(50),
-                    file_category VARCHAR(50) DEFAULT 'General',
-                    file_size_bytes BIGINT,
-                    is_archived BOOLEAN DEFAULT FALSE,
-                    uploaded_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                    client_id INT REFERENCES clients(id) ON DELETE CASCADE,
-                    case_id INT {case_fk},
-                    policy_id INT {policy_fk}
-                );
-            """))
-
-            # Billing Entries
-            conn.execute(text(f"""
-                CREATE TABLE IF NOT EXISTS billing_entries (
-                    id SERIAL PRIMARY KEY,
-                    description VARCHAR(255) NOT NULL,
-                    hours NUMERIC(6, 2),
-                    rate NUMERIC(10, 2),
-                    total_amount NUMERIC(10, 2) NOT NULL,
-                    is_paid BOOLEAN DEFAULT FALSE,
-                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                    client_id INT REFERENCES clients(id) ON DELETE CASCADE,
-                    case_id INT {case_fk},
-                    policy_id INT {policy_fk}
-                );
-            """))
-
+    with engine.connect() as conn:
+        try:
+            conn.execute(text("SET session_replication_role = 'replica';"))
             conn.commit()
+        except Exception:
+            pass
 
-    print("Provisioning tenant schemas according to vertical types...")
-    provision_tenant_schema("tenant_company_a", "insurance")
-    provision_tenant_schema("tenant_company_b", "general")
-    provision_tenant_schema("tenant_company_c", "legal")
-
-    # 2. Seed Public Tenant Accounts & Admin
-    db = SessionLocal()
-
-    ADMIN_HASH = hash_password("NewAdminSecret456!")
-    TENANT_HASH = hash_password("NewTenantSecret123!")
-
-    admin_user = db.query(models.Admin).filter_by(username="admin").first()
-    if not admin_user:
-        admin = models.Admin(username="admin", password_hash=ADMIN_HASH)
-        db.add(admin)
-
-    tenants = [
-        models.TenantAccount(company_name="company-a",
-                             password_hash=TENANT_HASH, tenant_type="insurance"),
-        models.TenantAccount(company_name="company-b",
-                             password_hash=TENANT_HASH, tenant_type="general"),
-        models.TenantAccount(company_name="company-c",
-                             password_hash=TENANT_HASH, tenant_type="legal"),
-    ]
-    db.add_all(tenants)
-    db.commit()
-
-    # 3. Seed Mock Data Tailored to Each Schema
-    print("Seeding Company A (Insurance)...")
-    with engine.connect() as conn:
-        conn.execute(text("SET search_path TO tenant_company_a;"))
-        conn.execute(text("""
-            INSERT INTO clients (id, name, phone, email, address, status, custom_fields) 
-            VALUES (1, 'Alice Smith', '050-111-2222', 'alice@company-a.com', '123 Main St', 'active', '{}');
+        for stmt in parsed_statements:
+            stmt_clean = sqlparse.format(stmt, strip_comments=True).strip()
             
-            INSERT INTO insurance_policies (id, client_id, policy_number, coverage_amount)
-            VALUES (1, 1, 'POL-INS-1001', 500000.00);
+            if not stmt_clean or stmt_clean.startswith("\\"):
+                continue
 
-            INSERT INTO notes (policy_id, author_name, content) 
-            VALUES (1, 'System User', 'Policy renewal reminder set.');
+            trans = conn.begin_nested()
+            try:
+                conn.execute(text(stmt_clean))
+                trans.commit()
+                inserted_count += 1
+            except Exception as e:
+                trans.rollback()
+                error_count += 1
+                if error_count <= 5:
+                    print(f"⚠️ Statement skipped due to error: {e}")
 
-            SELECT setval(pg_get_serial_sequence('clients', 'id'), (SELECT MAX(id) FROM clients));
-            SELECT setval(pg_get_serial_sequence('insurance_policies', 'id'), (SELECT MAX(id) FROM insurance_policies));
-            SELECT setval(pg_get_serial_sequence('notes', 'id'), (SELECT MAX(id) FROM notes));
-        """))
-        conn.commit()
+        try:
+            conn.execute(text("SET session_replication_role = 'origin';"))
+            conn.commit()
+        except Exception:
+            pass
 
-    print("Seeding Company B (General)...")
-    with engine.connect() as conn:
-        conn.execute(text("SET search_path TO tenant_company_b;"))
-        conn.execute(text("""
-            INSERT INTO clients (id, name, phone, email, address, status, custom_fields) 
-            VALUES (1, 'Bob Johnson', '050-333-4444', 'bob@company-b.com', '456 Market St', 'active', '{}');
-            
-            INSERT INTO notes (client_id, author_name, content) 
-            VALUES (1, 'System User', 'General lead follow-up scheduled.');
-
-            INSERT INTO billing_entries (client_id, description, total_amount, is_paid) 
-            VALUES (1, 'Consulting Retainer', 500.00, true);
-
-            SELECT setval(pg_get_serial_sequence('clients', 'id'), (SELECT MAX(id) FROM clients));
-            SELECT setval(pg_get_serial_sequence('notes', 'id'), (SELECT MAX(id) FROM notes));
-            SELECT setval(pg_get_serial_sequence('billing_entries', 'id'), (SELECT MAX(id) FROM billing_entries));
-        """))
-        conn.commit()
-
-    print("Seeding Company C (Legal)...")
-    with engine.connect() as conn:
-        conn.execute(text("SET search_path TO tenant_company_c;"))
-        conn.execute(text("""
-            INSERT INTO clients (id, name, phone, email, address, status, custom_fields) 
-            VALUES (1, 'Charlie Brown', '050-555-6666', 'charlie@company-c.com', '789 Legal Ave', 'active', '{}');
-            
-            INSERT INTO legal_cases (id, client_id, case_number, case_type, court, status)
-            VALUES (1, 1, 'CASE-LEG-3001', 'Civil Litigation', 'District Magistrate Court', 'Open');
-
-            INSERT INTO notes (case_id, author_name, note_type, content, is_pinned) 
-            VALUES (1, 'System User', 'General', 'Initial client consultation logged.', false);
-
-            INSERT INTO documents (case_id, file_name, file_path, file_category, file_size_bytes, is_archived) 
-            VALUES (1, 'engagement_letter.pdf', '/uploads/engagement_letter.pdf', 'Contract', 1024, false);
-
-            INSERT INTO billing_entries (case_id, description, hours, rate, total_amount, is_paid) 
-            VALUES (1, 'Initial consultation fee', 1.5, 166.67, 250.00, false);
-
-            SELECT setval(pg_get_serial_sequence('clients', 'id'), (SELECT MAX(id) FROM clients));
-            SELECT setval(pg_get_serial_sequence('legal_cases', 'id'), (SELECT MAX(id) FROM legal_cases));
-            SELECT setval(pg_get_serial_sequence('notes', 'id'), (SELECT MAX(id) FROM notes));
-            SELECT setval(pg_get_serial_sequence('documents', 'id'), (SELECT MAX(id) FROM documents));
-            SELECT setval(pg_get_serial_sequence('billing_entries', 'id'), (SELECT MAX(id) FROM billing_entries));
-        """))
-        conn.commit()
-
-    print("\n✅ Success! Database reset and seeded with modular schemas.")
-    db.close()
-
+    print(f"\n✅ Seeding complete! Successfully ran {inserted_count} statements ({error_count} skipped/errored).")
 
 if __name__ == "__main__":
     reset_and_seed()
