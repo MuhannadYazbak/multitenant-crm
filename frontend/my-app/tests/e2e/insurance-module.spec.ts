@@ -1,117 +1,74 @@
-// import { test, expect } from '@playwright/test';
-// import { InsuranceClientPage } from '../pages/InsuranceClientPage';
-// import { TenantLoginPage } from '../pages/TenantLoginPage';
-// test.describe('Insurance Module - Policy, Vehicle, Property Lifecycle', () => {
-//     const testTenant = 'company-a';
-//     // Unique name per run to prevent 409 collisions
-//     //const uniqueId = Date.now();
-//     const testClient = `Alice Smith`;
-//     //const testPolicyNumber = `POL-TEST-${uniqueId}`;
-//     let tenantLogin: TenantLoginPage;
-
-//     test.beforeEach(async ({ page }) => {
-//             tenantLogin = new TenantLoginPage(page);
-        
-//             // 1. Log in as Tenant Manager
-//             await tenantLogin.goto();
-//             await tenantLogin.login("manager@insurance.com", "my@1234");
-//             await page.waitForLoadState("networkidle");
-//             //await expect(page).toHaveURL("/company-a/mypage");
-//           });
-
-//     test('should create policy, vehicles, properties, and execute drawer actions', async ({ page, request }) => {
-//         // Seed Client and verify creation succeeded (200 or 201)
-//         //const uniqueSuffix = Math.random().toString(36).substring(2, 8); // pure letters/digits, but let's stick to letters for name
-//         //const randomLetters = Array.from({ length: 6 }, () => String.fromCharCode(97 + Math.floor(Math.random() * 26))).join('');
-//         //const testClient = `Alice Smith ${randomLetters}`; // Matches regex ^[A-Za-z\s'-]+$
-//         //const testPolicyNumber = `POL-TEST-${Date.now()}`;
-//         const currentUniqueId = Date.now();
-//         const testPolicyNumber = `POL-TEST-${currentUniqueId}`;
-//         const testPropertyAddress = `Herzl St ${currentUniqueId}, Tel Aviv`;
-
-//         // Seed Client
-//         const clientResponse = await request.post('http://127.0.0.1:8000/api/clients', {
-//             headers: {
-//                 'X-Tenant': testTenant,
-//                 'Content-Type': 'application/json'
-//             },
-//             data: {
-//                 name: testClient, // Cleaned up name passing regex
-//                 email: "alice@example.com",
-//                 phone: '0509876543',
-//                 address: 'Nazareth, Israel',
-//                 status: 'active',
-//                 custom_fields: {}
-//             }
-//         });
-
-//         expect([200, 201, 401]).toContain(clientResponse.status());
-
-//         const insurancePage = new InsuranceClientPage(page);
-
-//         // Pass testClient string so /mypage/Alice%20Smith... loads properly
-//         await insurancePage.goto(testTenant, testClient);
-
-//         // 2. Add Vehicle & Property Verticals
-//         //const testPropertyAddress = `Herzl St ${uniqueId}, Tel Aviv`;
-
-//         await insurancePage.addVehicle('Skoda', 'Rapid', 2017, '1122233');
-//         await expect(page.locator('body')).toContainText('1122233');
-
-//         await insurancePage.addProperty(testPropertyAddress, '2500000');
-//         await expect(page.locator('body')).toContainText(testPropertyAddress);
-
-//         // 3. Add Policy
-//         await insurancePage.createPolicy(testPolicyNumber, '150000');
-//         await expect(page.locator('table').first()).toContainText(testPolicyNumber);
-
-//         // 4. Open Policy Drawer & Add Note
-//         await insurancePage.openPolicyDrawer(testPolicyNumber);
-//         const noteContent = "Policy audit note";
-//         await insurancePage.addDrawerNote(noteContent);
-//         await expect(insurancePage.drawerContainer).toContainText(noteContent);
-
-//         // 5. Delete Policy
-//         await insurancePage.deletePolicy();
-//         await page.waitForTimeout(500);
-//         await expect(page.locator('table').first()).not.toContainText(testPolicyNumber);
-//     });
-// });
-
 import { test, expect } from '@playwright/test';
 import { InsuranceClientPage } from '../pages/InsuranceClientPage';
 import { TenantLoginPage } from '../pages/TenantLoginPage';
+import path from 'path';
+import fs from 'fs'
 
 test.describe('Insurance Module - Policy, Vehicle, Property Lifecycle', () => {
     const testTenant = 'company-a';
-    const testClient = `Alice Smith`;
     let tenantLogin: TenantLoginPage;
+    const dummyFilePath = path.join(__dirname, 'test-insurance.txt')
 
-    test.beforeEach(async ({ page }) => {
+    test.beforeAll(() => {
+        if (!fs.existsSync(dummyFilePath)) {
+            fs.writeFileSync(dummyFilePath, 'Legal contract test content');
+        }
+    });
+
+    test.beforeEach(async ({ page, context }) => {
+        await context.clearCookies();
         tenantLogin = new TenantLoginPage(page);
-        
+
         // 1. Log in as Tenant Manager
         await tenantLogin.goto();
+        await page.evaluate(() => localStorage.clear());
         await tenantLogin.login("manager@insurance.com", "my@1234");
+        await expect(page).toHaveURL("/company-a/mypage");
         await page.waitForLoadState("networkidle");
     });
 
-    test('should create policy, vehicles, properties, and execute drawer actions', async ({ page, request }) => {
-        // Generate fresh dynamic IDs inside the test execution context
-        test.setTimeout(60000)
+    test.afterAll(() => {
+        if (fs.existsSync(dummyFilePath)) {
+            fs.unlinkSync(dummyFilePath);
+        }
+    });
+
+    test('should create policy, vehicles, properties, and execute drawer actions', async ({ page }) => {
+        test.setTimeout(60000);
+
         const currentUniqueId = Date.now();
         const testPolicyNumber = `POL-TEST-${currentUniqueId}`;
         const testPropertyAddress = `Herzl St ${currentUniqueId}, Tel Aviv`;
 
-        // Seed Client
-        const clientResponse = await request.post('http://127.0.0.1:8000/api/clients', {
-            headers: {
-                'X-Tenant': testTenant,
-                'Content-Type': 'application/json'
-            },
+        // 1. Generate a pure-letter name to satisfy pattern=r"^[A-Za-z\s'-]+$"
+        const randomLetters = Array.from({ length: 6 }, () =>
+            String.fromCharCode(97 + Math.floor(Math.random() * 26))
+        ).join('');
+        const testClient = `Alice ${randomLetters.toUpperCase()}`;
+        const testEmail = `alice_${currentUniqueId}@example.com`;
+
+        // 2. Retrieve token from browser storage
+        const authHeader = await page.evaluate(() => {
+            const token = localStorage.getItem('token') ||
+                localStorage.getItem('access_token') ||
+                sessionStorage.getItem('token');
+            return token ? `Bearer ${token}` : null;
+        });
+
+        const headers: Record<string, string> = {
+            'X-Tenant': testTenant,
+            'Content-Type': 'application/json'
+        };
+        if (authHeader) {
+            headers['Authorization'] = authHeader; // 👈 Raw authHeader without extra 'Bearer '
+        }
+
+        // 3. Seed Client with exact ClientCreate schema matching
+        const clientResponse = await page.request.post('http://127.0.0.1:8000/api/clients', {
+            headers,
             data: {
                 name: testClient,
-                email: "alice@example.com",
+                email: testEmail,
                 phone: '0509876543',
                 address: 'Nazareth, Israel',
                 status: 'active',
@@ -119,33 +76,38 @@ test.describe('Insurance Module - Policy, Vehicle, Property Lifecycle', () => {
             }
         });
 
-        expect([200, 201, 401]).toContain(clientResponse.status());
+        if (clientResponse.status() >= 400) {
+            console.error('API Error Details:', await clientResponse.text());
+        }
+
+        expect([200, 201]).toContain(clientResponse.status());
 
         const insurancePage = new InsuranceClientPage(page);
 
-        // Load profile page
+        // 4. Load profile page for the newly created unique client
         await insurancePage.goto(testTenant, testClient);
 
-        // 2. Add Vehicle & Property Verticals
+        // 5. Add Vehicle & Property Verticals
         await insurancePage.addVehicle('Skoda', 'Octavia', 2012, '3322211');
+        await page.waitForLoadState("networkidle");
         await expect(page.locator('body')).toContainText('3322211');
 
         await insurancePage.addProperty(testPropertyAddress, '1234');
         await expect(page.locator('body')).toContainText(testPropertyAddress);
 
-        // 3. Add Policy
+        // 6. Add Policy
         await insurancePage.createPolicy(testPolicyNumber, '150000');
         await expect(page.locator('table').first()).toContainText(testPolicyNumber);
 
-        // 4. Open Policy Drawer & Add Note
+        // 7. Open Policy Drawer & Add Note
         await insurancePage.openPolicyDrawer(testPolicyNumber);
         const noteContent = "Policy audit note";
         await insurancePage.addDrawerNote(noteContent);
         await expect(insurancePage.drawerContainer).toContainText(noteContent);
 
-        // 5. Delete Policy
+        // 8. Delete Policy
         await insurancePage.deletePolicy();
-        await page.waitForTimeout(500);
+        await page.waitForTimeout(1500);
         await expect(page.locator('table').first()).not.toContainText(testPolicyNumber);
     });
 });

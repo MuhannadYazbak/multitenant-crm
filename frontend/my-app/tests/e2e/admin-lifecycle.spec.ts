@@ -13,7 +13,10 @@ test.describe("Admin System Lifecycle Suite", () => {
     type: "insurance" as const,
   };
 
-  test.beforeEach(async ({ page }) => {
+  test.beforeEach(async ({ page, context }) => {
+    await context.clearCookies();
+    await page.goto('/');
+    await page.evaluate(() => localStorage.clear());
     adminLogin = new AdminLoginPage(page);
     adminDashboard = new AdminDashboardPage(page);
 

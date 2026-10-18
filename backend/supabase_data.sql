@@ -315,7 +315,7 @@ INSERT INTO public.audit_logs (id, user_id, user_email, action, resource, detail
 INSERT INTO public.audit_logs (id, user_id, user_email, action, resource, details, ip_address, created_at, tenant_id) VALUES (17, 6, 'manager@yazbak.com', 'USER_DEACTIVATED', 'users', '{"email": "viewer@yazbak.com", "deactivated_user_id": 7}', '127.0.0.1', '2026-09-24 10:52:41.263735+00', 7);
 INSERT INTO public.audit_logs (id, user_id, user_email, action, resource, details, ip_address, created_at, tenant_id) VALUES (18, 6, 'manager@yazbak.com', 'CLIENT_CREATED', 'clients', '{"name": "Ab Cd", "client_id": 3}', '127.0.0.1', '2026-09-27 13:22:59.921595+00', 7);
 INSERT INTO public.audit_logs (id, user_id, user_email, action, resource, details, ip_address, created_at, tenant_id) VALUES (19, 6, 'manager@yazbak.com', 'CLIENT_CREATED', 'clients', '{"name": "Test Test", "client_id": 4}', '127.0.0.1', '2026-09-27 13:27:38.80157+00', 7);
-INSERT INTO public.audit_logs (id, user_id, user_email, action, resource, details, ip_address, created_at, tenant_id) VALUES (20, 6, 'manager@yazbak.com', 'USER_UPDATED', 'users', '{"is_active": true, "updated_user_id": 8}', '127.0.0.1', '2026-09-28 09:40:33.243608+00', NULL);
+INSERT INTO public.audit_logs (id, user_id, user_email, action, resource, details, ip_address, created_at, tenant_id) VALUES (20, 6, 'manager@yazbak.com', 'USER_UPDATED', 'users', '{"is_active": true, "updated_user_id": 8}', '127.0.0.1', '2026-09-28 09:40:33.243608+00', 7);
 INSERT INTO public.audit_logs (id, user_id, user_email, action, resource, details, ip_address, created_at, tenant_id) VALUES (21, 8, 'yazbakm@gmail.com', 'CLIENT_CREATED', 'clients', '{"name": "New User", "client_id": 5}', '127.0.0.1', '2026-09-28 09:58:29.185926+00', 7);
 INSERT INTO public.audit_logs (id, user_id, user_email, action, resource, details, ip_address, created_at, tenant_id) VALUES (22, 8, 'yazbakm@gmail.com', 'CLIENT_UPDATED', 'clients', '{"name": "Test Tests", "client_id": 4}', '127.0.0.1', '2026-09-28 10:08:55.212424+00', 7);
 INSERT INTO public.audit_logs (id, user_id, user_email, action, resource, details, ip_address, created_at, tenant_id) VALUES (23, 8, 'yazbakm@gmail.com', 'NOTE_CREATED', 'notes', '{"note_id": 1, "entity_id": 5, "entity_type": "client"}', '127.0.0.1', '2026-09-28 10:12:29.649601+00', 7);
@@ -379,7 +379,38 @@ INSERT INTO public.roles (id, name, permissions) VALUES (1, 'Admin', '["*:*"]');
 INSERT INTO public.roles (id, name, permissions) VALUES (3, 'Viewer', '["clients:read", "notes:read", "documents:read", "billing:read"]');
 INSERT INTO public.roles (id, name, permissions) VALUES (4, 'super_admin', '["*"]');
 INSERT INTO public.roles (id, name, permissions) VALUES (5, 'Editor', '["clients:read", "clients:write", "notes:read", "notes:write", "documents:read", "documents:write", "billing:read", "billing:write", "dashboard:read", "audit:read"]');
-INSERT INTO public.roles (id, name, permissions) VALUES (2, 'Manager', '["clients:read", "clients:write", "clients:delete", "notes:read", "notes:write", "notes:delete", "documents:read", "documents:write", "documents:delete", "billing:read", "billing:write", "billing:delete", "dashboard:read", "audit:read"]');
+INSERT INTO public.roles (id, name, permissions) VALUES (2, 'Manager', '["clients:read", "clients:write", "clients:delete",
+  "notes:read",
+  "notes:write",
+  "notes:delete",
+  "documents:read",
+  "documents:write",
+  "documents:delete",
+  "billing:read",
+  "billing:write",
+  "billing:delete",
+  "dashboard:read",
+  "audit:read",
+  "audit:write",
+  "legal:read",
+  "legal:write",
+  "legal:delete",
+  "insurance:read",
+  "insurance:write",
+  "insurance:delete",
+  "vehicles:read",
+  "vehicles:write",
+  "vehicles:delete",
+  "properties:read",
+  "properties:write",
+  "properties:delete",
+  "witnesses:read",
+  "witnesses:write",
+  "witnesses:delete",
+  "evidences:read",
+  "evideneces:write",
+  "evidences:delete"
+]');
 
 
 --
@@ -390,6 +421,7 @@ INSERT INTO public.user_roles (id, user_id, role_id) VALUES (1, 2, 1);
 INSERT INTO public.user_roles (id, user_id, role_id) VALUES (2, 2, 4);
 INSERT INTO public.user_roles (id, user_id, role_id) VALUES (3, 3, 2);
 INSERT INTO public.user_roles (id, user_id, role_id) VALUES (4, 6, 2);
+INSERT INTO public.user_roles (id, user_id, role_id) VALUES (6, 6, 2);
 INSERT INTO public.user_roles (id, user_id, role_id) VALUES (7, 7, 3);
 INSERT INTO public.user_roles (id, user_id, role_id) VALUES (8, 8, 5);
 INSERT INTO public.user_roles (id, user_id, role_id) VALUES (9, 9, 2);

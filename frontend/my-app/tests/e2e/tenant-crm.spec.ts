@@ -8,7 +8,10 @@ test.describe("Tenant CRM Full End-to-End Suite", () => {
   let tenantDashboard: TenantDashboardPage;
   let clientDetail: ClientDetailPage;
 
-  test.beforeEach(async ({ page }) => {
+  test.beforeEach(async ({ page, context }) => {
+    await context.clearCookies();
+    await page.goto('/');
+    await page.evaluate(() => localStorage.clear());
     tenantLogin = new TenantLoginPage(page);
     tenantDashboard = new TenantDashboardPage(page);
     clientDetail = new ClientDetailPage(page);

@@ -118,6 +118,14 @@ def create_case(
     db.add(new_case)
     db.flush()
 
+    c_id = new_case.id
+    c_number = new_case.case_number
+    c_type = new_case.case_type
+    c_status = new_case.status
+    c_client_id = new_case.client_id
+    c_court = new_case.court
+    c_created_at = new_case.created_at
+
     log_activity(
         db=db,
         action="LEGAL_CASE_CREATED",
@@ -125,14 +133,20 @@ def create_case(
         tenant_id=current_user.tenant_id,
         user_id=current_user.id,
         user_email=current_user.email,
-        details={"case_id": new_case.id, "case_number": new_case.case_number, "client_id": new_case.client_id},
+        details={"case_id": c_id, "case_number": c_number, "client_id": c_client_id},
         request=request
     )
 
     db.commit()
-    db.refresh(new_case)
-    return new_case
-
+    return {
+        "id": c_id,
+        "case_number": c_number,
+        "case_type": c_type,
+        "status": c_status,
+        "client_id": c_client_id,
+        "court": c_court,
+        "created_at": c_created_at
+    }
 
 @router.get(
     "/cases/{case_id}", 
@@ -457,6 +471,9 @@ def get_client_evidences(
     return db.query(models.Evidence).filter(models.Evidence.client_id == client_id).all()
 
 
+import uuid
+from sqlalchemy.exc import SQLAlchemyError
+
 @router.post(
     "/clients/{client_id}/evidences", 
     response_model=schemas.EvidenceResponse, 
@@ -477,25 +494,52 @@ def create_evidence(
         raise HTTPException(status_code=404, detail="Client not found")
 
     dumped = evidence_data.model_dump() if hasattr(evidence_data, "model_dump") else evidence_data.dict()
-    new_evidence = models.Evidence(client_id=client_id, **dumped)
     
-    db.add(new_evidence)
-    db.flush()
-
-    log_activity(
-        db=db,
-        action="EVIDENCE_CREATED",
-        resource="evidences",
-        tenant_id=current_user.tenant_id,
-        user_id=current_user.id,
-        user_email=current_user.email,
-        details={"evidence_id": new_evidence.id, "client_id": client_id},
-        request=request
+    # 1. Instantiate with explicit UUID to guarantee primary key exists immediately
+    new_evidence = models.Evidence(
+        id=str(uuid.uuid4()),
+        client_id=client_id, 
+        **dumped
     )
+    
+    try:
+        db.add(new_evidence)
+        db.flush() # flush assigns the id and server-defaults while keeping session active
 
-    db.commit()
-    db.refresh(new_evidence)
-    return new_evidence
+        e_id = new_evidence.id
+        e_client_id = new_evidence.client_id
+        e_type = new_evidence.evidence_type
+        e_detail = new_evidence.evidence_detail
+        e_created_at = new_evidence.created_at
+
+        log_activity(
+            db=db,
+            action="EVIDENCE_CREATED",
+            resource="evidences",
+            tenant_id=current_user.tenant_id,
+            user_id=current_user.id,
+            user_email=current_user.email,
+            details={"evidence_id": e_id, "client_id": client_id},
+            request=request
+        )
+
+        db.commit()
+
+        return {
+            "id": e_id,
+            "client_id": e_client_id,
+            "evidence_type": e_type,
+            "evidence_detail": e_detail,
+            "created_at": e_created_at
+        }
+
+    except SQLAlchemyError as e:
+        db.rollback()
+        print(f"❌ DATABASE ERROR: {repr(e.orig) if hasattr(e, 'orig') else str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Database commit failed: {str(e)}"
+        )
 
 
 @router.put(
@@ -605,11 +649,23 @@ def create_witness(
         raise HTTPException(status_code=404, detail="Client not found")
 
     dumped = witness_data.model_dump() if hasattr(witness_data, "model_dump") else witness_data.dict()
-    new_witness = models.Witness(client_id=client_id, **dumped)
+    new_witness = models.Witness(
+        id=str(uuid.uuid4()),
+        client_id=client_id,
+        **dumped
+    )
     
     db.add(new_witness)
     db.flush()
 
+    w_id = new_witness.id
+    w_client_id = new_witness.client_id
+    w_name = new_witness.name
+    w_phone = new_witness.phone
+    w_email = new_witness.email
+    w_age = getattr(new_witness, "age", None)
+    w_created_at = new_witness.created_at
+    
     log_activity(
         db=db,
         action="WITNESS_CREATED",
@@ -617,13 +673,20 @@ def create_witness(
         tenant_id=current_user.tenant_id,
         user_id=current_user.id,
         user_email=current_user.email,
-        details={"witness_id": new_witness.id, "client_id": client_id},
+        details={"witness_id": w_id, "client_id": client_id},
         request=request
     )
 
     db.commit()
-    db.refresh(new_witness)
-    return new_witness
+    return {
+        "id": w_id,
+        "client_id": w_client_id,
+        "name": w_name,
+        "phone": w_phone,
+        "email": w_email,
+        "age": w_age,
+        "created_at": w_created_at
+    }
 
 
 @router.put(

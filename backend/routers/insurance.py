@@ -51,6 +51,14 @@ def create_policy(
     
     db.add(new_policy)
     db.flush()
+
+    p_id = new_policy.id
+    p_client_id = new_policy.client_id
+    p_number = new_policy.policy_number
+    p_coverage = new_policy.coverage_amount
+    p_start = new_policy.start_date
+    p_end = new_policy.end_date
+    p_created = new_policy.created_at
     
     log_activity(
         db=db,
@@ -59,14 +67,20 @@ def create_policy(
         tenant_id=current_user.tenant_id,
         user_id=current_user.id,
         user_email=current_user.email,
-        details={"policy_id": new_policy.id, "policy_number": new_policy.policy_number, "client_id": client.id},
+        details={"policy_id": p_id, "policy_number": p_number, "client_id": client.id},
         request=request
     )
     
     db.commit()
-    db.refresh(new_policy)
-    return new_policy
-
+    return {
+        "id": p_id,
+        "client_id": p_client_id,
+        "policy_number": p_number,
+        "coverage_amount": p_coverage,
+        "start_date": p_start,
+        "end_date": p_end,
+        "created_at": p_created
+    }
 
 @router.get(
     "/clients/{client_id}/policies", 
@@ -157,6 +171,14 @@ def create_vehicle(
     
     db.add(new_vehicle)
     db.flush()
+
+    v_id = new_vehicle.id
+    v_client_id = new_vehicle.client_id
+    v_manufacturer = new_vehicle.manufacturer
+    v_model = new_vehicle.model
+    v_year = new_vehicle.year
+    v_plate_no = new_vehicle.plate_no
+    v_created_at = new_vehicle.created_at
     
     log_activity(
         db=db,
@@ -165,13 +187,20 @@ def create_vehicle(
         tenant_id=current_user.tenant_id,
         user_id=current_user.id,
         user_email=current_user.email,
-        details={"vehicle_id": new_vehicle.id, "plate_no": getattr(new_vehicle, "plate_no", None), "client_id": client_id},
+        details={"vehicle_id": v_id, "plate_no": v_plate_no, "client_id": client_id},
         request=request
     )
 
     db.commit()
-    db.refresh(new_vehicle)
-    return new_vehicle
+    return {
+        "id": v_id,
+        "client_id": v_client_id,
+        "manufacturer": v_manufacturer,
+        "model": v_model,
+        "year": v_year,
+        "plate_no": v_plate_no,
+        "created_at": v_created_at
+    }
 
 
 @router.put(
@@ -180,7 +209,7 @@ def create_vehicle(
     dependencies=[Depends(require_permission("insurance:write"))]
 )
 def update_vehicle(
-    vehicle_id: int,
+    vehicle_id: str,
     vehicle_update: schemas.VehicleCreate,
     request: Request,
     current_user: models.User = Depends(get_current_user),
@@ -218,7 +247,7 @@ def update_vehicle(
     dependencies=[Depends(require_permission("insurance:delete"))]
 )
 def delete_vehicle(
-    vehicle_id: int, 
+    vehicle_id: str, 
     request: Request,
     current_user: models.User = Depends(get_current_user),
     db: Session = Depends(get_db_for_tenant)
@@ -287,6 +316,14 @@ def create_property(
     
     db.add(new_property)
     db.flush()
+
+    prop_id = new_property.id
+    prop_client_id = new_property.client_id
+    prop_address = new_property.address
+    prop_type = getattr(new_property, "property_type", None)
+    prop_value = getattr(new_property, "value", None)
+    prop_created_at = new_property.created_at
+    prop_area = new_property.area
     
     log_activity(
         db=db,
@@ -295,13 +332,20 @@ def create_property(
         tenant_id=current_user.tenant_id,
         user_id=current_user.id,
         user_email=current_user.email,
-        details={"property_id": new_property.id, "client_id": client_id},
+        details={"property_id": prop_id, "client_id": client_id},
         request=request
     )
 
     db.commit()
-    db.refresh(new_property)
-    return new_property
+    return {
+        "id": prop_id,
+        "client_id": prop_client_id,
+        "address": prop_address,
+        "property_type": prop_type,
+        "value": prop_value,
+        "area": prop_area,
+        "created_at": prop_created_at
+    }
 
 
 @router.put(

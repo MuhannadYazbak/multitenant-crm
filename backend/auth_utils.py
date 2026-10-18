@@ -4,7 +4,7 @@ import bcrypt
 import jwt
 from datetime import datetime, timedelta, timezone
 from typing import Optional
-from fastapi import HTTPException, status, Depends
+from fastapi import HTTPException, Request, status, Depends
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from sqlalchemy.orm import Session
 from database import get_db, get_db_for_tenant  # <--- Imported database generators
@@ -89,12 +89,73 @@ def create_user_access_token(data: dict) -> str:
     to_encode.update({"exp": expire, "type": "user_access"})
     return jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
 
+def get_current_user(
+    request: Request,
+    credentials: HTTPAuthorizationCredentials = Depends(security),
+    db: Session = Depends(get_db_for_tenant) # 👈 Change get_db to get_db_for_tenant
+):
+    from models import User
+    token = credentials.credentials
+    try:
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        user_id = payload.get("sub")
+        if user_id is None:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Invalid token payload",
+            )
+    except jwt.ExpiredSignatureError:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="User session expired. Please log in again.",
+        )
+    except jwt.PyJWTError:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Could not validate credentials",
+        )
+
+    # Convert to string and strip to handle numeric IDs safely
+    user_id_str = str(user_id).strip()
+
+    if user_id_str.isdigit():
+        user = db.query(User).filter(User.id == int(user_id_str)).first()
+    else:
+        user = db.query(User).filter(User.email == user_id_str).first()
+
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="User not found",
+        )
+    if not getattr(user, "is_active", True):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Inactive user account",
+        )
+
+    # --- Fetch user's role_ids from user_roles junction table ---
+    role_rows = db.execute(
+        text("SELECT role_id FROM user_roles WHERE user_id = :uid"),
+        {"uid": user.id}
+    ).fetchall()
+    
+    user.role_ids = [r[0] for r in role_rows]
+    user.role_id = user.role_ids[0] if user.role_ids else None
+
+    # Attach tenant_id safely if missing from model instance
+    if not hasattr(user, "tenant_id") or user.tenant_id is None:
+        user.tenant_id = payload.get("tenant_id") or getattr(request.state, "tenant_id", None)
+
+    return user
+
+from sqlalchemy import text  # Import text
+
 # def get_current_user(
 #     credentials: HTTPAuthorizationCredentials = Depends(security),
 #     db: Session = Depends(get_db)
 # ):
-#     """Decodes Bearer token, validates user in database, and ensures active status."""
-#     from models import User  # Local import to prevent circular dependency
+#     from models import User
 #     token = credentials.credentials
 #     try:
 #         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
@@ -119,6 +180,7 @@ def create_user_access_token(data: dict) -> str:
 #         user = db.query(User).filter(User.id == int(user_id)).first()
 #     else:
 #         user = db.query(User).filter(User.email == user_id).first()
+
 #     if not user:
 #         raise HTTPException(
 #             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -130,59 +192,14 @@ def create_user_access_token(data: dict) -> str:
 #             detail="Inactive user account",
 #         )
 
-#     return user
-
-from sqlalchemy import text  # Import text
-
-def get_current_user(
-    credentials: HTTPAuthorizationCredentials = Depends(security),
-    db: Session = Depends(get_db)
-):
-    from models import User
-    token = credentials.credentials
-    try:
-        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
-        user_id = payload.get("sub")
-        if user_id is None:
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Invalid token payload",
-            )
-    except jwt.ExpiredSignatureError:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="User session expired. Please log in again.",
-        )
-    except jwt.PyJWTError:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Could not validate credentials",
-        )
-
-    if user_id.isdigit():
-        user = db.query(User).filter(User.id == int(user_id)).first()
-    else:
-        user = db.query(User).filter(User.email == user_id).first()
-
-    if not user:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="User not found",
-        )
-    if not user.is_active:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Inactive user account",
-        )
-
-    # --- Fetch user's role_ids from user_roles junction table ---
-    role_rows = db.execute(
-        text("SELECT role_id FROM user_roles WHERE user_id = :uid"),
-        {"uid": user.id}
-    ).fetchall()
+#     # --- Fetch user's role_ids from user_roles junction table ---
+#     role_rows = db.execute(
+#         text("SELECT role_id FROM user_roles WHERE user_id = :uid"),
+#         {"uid": user.id}
+#     ).fetchall()
     
-    # Store list of role IDs (e.g. [1, 2]) and primary role_id (or None)
-    user.role_ids = [r[0] for r in role_rows]
-    user.role_id = user.role_ids[0] if user.role_ids else None
+#     # Store list of role IDs (e.g. [1, 2]) and primary role_id (or None)
+#     user.role_ids = [r[0] for r in role_rows]
+#     user.role_id = user.role_ids[0] if user.role_ids else None
 
-    return user
+#     return user

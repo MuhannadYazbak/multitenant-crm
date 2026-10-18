@@ -48,17 +48,7 @@ export class InsuranceClientPage extends BaseClientPage {
         await this.policiesTabButton.click();
     }
 
-    // async createPolicy(policyNumber: string, coverageAmount: string) {
-    //     await this.clickPoliciesTab();
-    //     await this.addPolicyButton.click();
-    //     await this.policyNumberInput.fill(policyNumber);
-    //     await this.coverageAmountInput.fill(coverageAmount);
-    //     await this.submitPolicyButton.click();
-    //     await this.page.waitForLoadState('networkidle');
-    // }
-
-    // tests/pages/InsuranceClientPage.ts
-
+    
     async createPolicy(policyNumber: string, coverageAmount: string) {
         // 1. Open Policy Modal
         await this.clickPoliciesTab();

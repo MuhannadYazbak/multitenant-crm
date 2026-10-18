@@ -291,8 +291,8 @@ class PropertyResponse(PropertyBase):
 
 # --- Evidencee SCHEMAS ---
 class EvidenceBase(BaseModel):
-    evidence_type: str = Field(..., min_length=3, max_length=100)
-    evidence_detail: str = Field(..., min_length=5, max_length=100)
+    evidence_type: str = Field(..., min_length=1, max_length=100)
+    evidence_detail: str = Field(..., min_length=1, max_length=1000)
 
 class EvidenceCreate(EvidenceBase):
     pass

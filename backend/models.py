@@ -202,10 +202,9 @@ class Evidence(Base):
     client_id = Column(Integer, ForeignKey("clients.id", ondelete="CASCADE"), nullable=False)
     
     evidence_type = Column(String(100), nullable=False)
-    evidence_detail = Column(String(100), nullable=False)
+    evidence_detail = Column(String(1000), nullable=False) # Increased to 1000 in DB model too
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
-    # Relationship back to Client
     client = relationship("Client", back_populates="evidences")
 
 

@@ -26,7 +26,12 @@ app = FastAPI()
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=[
+        "http://localhost:3000",
+        "http://127.0.0.1:3000",
+        "http://localhost:8000",
+        "http://127.0.0.1:8000",
+    ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -46,6 +51,10 @@ app.include_router(internal.router)
 app.include_router(audit.router)
 app.include_router(tenant_users.router)
 
+
+# @app.get("/api/health")
+# def health_check():
+#     return {"status": "ok"}
 # --- AUTH & TENANT ENDPOINTS ---
 
 @app.post("/api/tenants/login")
@@ -148,7 +157,7 @@ def add_tenant_client(
 )
 
         db.commit()
-
+        #print(res_id + " " + res_name + " " + res_email + " " + res_phone + " " + res_address + " " + res_status)
         return {
             "id": res_id,
             "name": res_name,

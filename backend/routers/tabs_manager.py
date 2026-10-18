@@ -81,6 +81,7 @@ def get_entity_notes(
     return query.order_by(models.Note.is_pinned.desc(), models.Note.created_at.desc()).all()
 
 
+
 @router.post(
     "/{entity_type}/{entity_id}/notes", 
     response_model=schemas.NoteResponse, 
@@ -113,6 +114,16 @@ def create_entity_note(
     db.add(new_note)
     db.flush()
 
+    n_id = str(new_note.id)
+    n_client_id = new_note.client_id
+    n_case_id = new_note.case_id
+    n_policy_id = new_note.policy_id
+    n_author = new_note.author_name
+    n_content = new_note.content
+    n_type = new_note.note_type
+    n_pinned = new_note.is_pinned
+    n_created_at = new_note.created_at
+
     log_activity(
         db=db,
         action="NOTE_CREATED",
@@ -120,13 +131,84 @@ def create_entity_note(
         tenant_id=current_user.tenant_id,
         user_id=current_user.id,
         user_email=current_user.email,
-        details={"note_id": new_note.id, "entity_type": entity_type, "entity_id": entity_id},
+        details={"note_id": n_id, "entity_type": entity_type, "entity_id": entity_id},
         request=request
     )
 
     db.commit()
-    db.refresh(new_note)
-    return new_note
+    return {
+        "id": n_id,
+        "client_id": n_client_id,
+        "case_id": n_case_id,
+        "policy_id": n_policy_id,
+        "author_name": n_author,
+        "content": n_content,
+        "note_type": n_type,
+        "is_pinned": n_pinned,
+        "created_at": n_created_at
+    }
+
+from sqlalchemy.exc import SQLAlchemyError
+from fastapi import HTTPException, status
+
+@router.post(
+    "/clients/{client_id}/vehicles", 
+    response_model=schemas.VehicleResponse, 
+    status_code=status.HTTP_201_CREATED,
+    dependencies=[Depends(require_permission("insurance:write"))]
+)
+def create_vehicle(
+    client_id: int,
+    vehicle_data: schemas.VehicleCreate, 
+    request: Request,
+    current_user: models.User = Depends(get_current_user),
+    db: Session = Depends(get_db_for_tenant)
+):
+    check_insurance_tenant(db)
+
+    client = db.query(models.Client).filter(models.Client.id == client_id).first()
+    if not client:
+        raise HTTPException(status_code=404, detail="Client not found")
+
+    dumped = vehicle_data.model_dump() if hasattr(vehicle_data, "model_dump") else vehicle_data.dict()
+    new_vehicle = models.Vehicle(client_id=client_id, **dumped)
+    
+    try:
+        db.add(new_vehicle)
+        db.flush()
+        
+        log_activity(
+            db=db,
+            action="VEHICLE_CREATED",
+            resource="vehicles",
+            tenant_id=current_user.tenant_id,
+            user_id=current_user.id,
+            user_email=current_user.email,
+            details={"vehicle_id": new_vehicle.id, "plate_no": getattr(new_vehicle, "plate_no", None), "client_id": client_id},
+            request=request
+        )
+
+        db.commit()
+
+        # Return a plain dictionary so FastAPI never touches the closed session
+        return {
+            "id": new_vehicle.id,
+            "client_id": new_vehicle.client_id,
+            "manufacturer": getattr(new_vehicle, "manufacturer", None),
+            "model": new_vehicle.model,
+            "year": new_vehicle.year,
+            "plate_no": getattr(new_vehicle, "plate_no", None),
+            "created_at": new_vehicle.created_at
+        }
+        
+    except Exception as e:
+        db.rollback()
+        raw_err = repr(e.orig) if hasattr(e, "orig") else str(e)
+        print(f"DATABASE COMMIT FAILURE IN CREATE VEHICLE: {raw_err}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Vehicle creation failed: {raw_err}"
+        )
 
 
 @router.delete(
@@ -235,6 +317,17 @@ def upload_entity_document(
     db.add(doc)
     db.flush()
 
+    d_id = doc.id
+    d_client_id = doc.client_id
+    d_case_id = doc.case_id
+    d_policy_id = doc.policy_id
+    d_file_name = doc.file_name
+    d_file_path = doc.file_path
+    d_file_category = doc.file_category
+    d_file_size = doc.file_size_bytes
+    d_is_archived = getattr(doc, "is_archived", False)
+    d_uploaded_at = doc.uploaded_at
+
     log_activity(
         db=db,
         action="DOCUMENT_UPLOADED",
@@ -242,13 +335,24 @@ def upload_entity_document(
         tenant_id=current_user.tenant_id,
         user_id=current_user.id,
         user_email=current_user.email,
-        details={"doc_id": doc.id, "file_name": file.filename, "file_category": file_category},
+        details={"doc_id": d_id, "file_name": d_file_name, "file_category": d_file_category},
         request=request
     )
 
     db.commit()
-    db.refresh(doc)
-    return doc
+    return {
+        "id": d_id,
+        "client_id": d_client_id,
+        "case_id": d_case_id,
+        "policy_id": d_policy_id,
+        "file_name": d_file_name,
+        "file_path": d_file_path,
+        "file_category": d_file_category,
+        "file_size_bytes": d_file_size,
+        "is_archived": d_is_archived,
+        "uploaded_at": d_uploaded_at
+    }
+
 
 
 @router.put(
@@ -270,6 +374,18 @@ def archive_entity_document(
         raise HTTPException(status_code=404, detail="Document not found")
 
     doc.is_archived = True
+    db.flush()
+
+    d_id = doc.id
+    d_client_id = doc.client_id
+    d_case_id = doc.case_id
+    d_policy_id = doc.policy_id
+    d_file_name = doc.file_name
+    d_file_path = doc.file_path
+    d_file_category = doc.file_category
+    d_file_size = doc.file_size_bytes
+    d_is_archived = doc.is_archived
+    d_uploaded_at = doc.uploaded_at
 
     log_activity(
         db=db,
@@ -278,14 +394,23 @@ def archive_entity_document(
         tenant_id=current_user.tenant_id,
         user_id=current_user.id,
         user_email=current_user.email,
-        details={"document_id": document_id, "file_name": doc.file_name},
+        details={"document_id": document_id, "file_name": d_file_name},
         request=request
     )
 
     db.commit()
-    db.refresh(doc)
-    return doc
-
+    return {
+        "id": d_id,
+        "client_id": d_client_id,
+        "case_id": d_case_id,
+        "policy_id": d_policy_id,
+        "file_name": d_file_name,
+        "file_path": d_file_path,
+        "file_category": d_file_category,
+        "file_size_bytes": d_file_size,
+        "is_archived": d_is_archived,
+        "uploaded_at": d_uploaded_at
+    }
 
 # ==========================================
 # 3. BILLING TAB
@@ -349,6 +474,15 @@ def create_entity_billing_entry(
     db.add(entry)
     db.flush()
 
+    b_id = entry.id
+    b_client_id = entry.client_id
+    b_case_id = entry.case_id
+    b_policy_id = entry.policy_id
+    b_description = getattr(entry, "description", None)
+    b_amount = getattr(entry, "total_amount", 0.0)
+    b_status = getattr(entry, "status", None)
+    b_created_at = entry.created_at
+
     log_activity(
         db=db,
         action="BILLING_ENTRY_CREATED",
@@ -356,13 +490,21 @@ def create_entity_billing_entry(
         tenant_id=current_user.tenant_id,
         user_id=current_user.id,
         user_email=current_user.email,
-        details={"billing_id": entry.id, "total_amount": float(getattr(entry, "total_amount", 0.0))},
+        details={"billing_id": b_id, "total_amount": float(b_amount)},
         request=request
     )
 
     db.commit()
-    db.refresh(entry)
-    return entry
+    return {
+        "id": b_id,
+        "client_id": b_client_id,
+        "case_id": b_case_id,
+        "policy_id": b_policy_id,
+        "description": b_description,
+        "total_amount": b_amount,
+        "status": b_status,
+        "created_at": b_created_at
+    }
 
 
 @router.delete(
