@@ -236,7 +236,7 @@ def request_password_reset(payload: ForgotPasswordPayload, db: Session = Depends
     if IS_DEV_OR_TEST:
         return {
             **generic_response,
-            "dev_reset_url": reset_url,
+            "devResetUrl": reset_url,
             "dev_token": token
         }
 

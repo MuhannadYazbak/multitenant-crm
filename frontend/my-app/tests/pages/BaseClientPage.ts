@@ -102,6 +102,7 @@ export class BaseClientPage {
         // 4. Trigger React state binding updates
         await fileInput.dispatchEvent('input');
         await fileInput.dispatchEvent('change');
+        await this.page.waitForTimeout(500);
 
         // 5. Fill document title/name if mandatory in form
         const titleInput = this.page.locator('form input[type="text"], div[role="dialog"] input[type="text"]').first();
