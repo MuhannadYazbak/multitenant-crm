@@ -20,7 +20,7 @@ from schemas import TenantLoginRequest
 from models import TenantAccount
 from routers import insurance, dashboard, legal, admin, tabs_manager, auth, internal, audit, tenant_users
 
-models.Base.metadata.create_all(bind=engine)
+#models.Base.metadata.create_all(bind=engine)
 
 app = FastAPI()
 
