@@ -13,20 +13,23 @@ test.describe("Admin System Lifecycle Suite", () => {
     type: "insurance" as const,
   };
 
-  test.beforeEach(async ({ page }) => {
+  test.beforeEach(async ({ page, context }) => {
+    await context.clearCookies();
+    await page.goto('/');
+    await page.evaluate(() => localStorage.clear());
     adminLogin = new AdminLoginPage(page);
     adminDashboard = new AdminDashboardPage(page);
 
     // 1. Log in as superadmin
     await adminLogin.goto();
-    await adminLogin.login("admin", "NewAdminSecret456!");
+    await adminLogin.login("admin@example.com", "Admin123456!");
     await expect(page).toHaveURL("/admin/dashboard");
   });
 
   test("should provision a new tenant and manage lifecycle status", async () => {
     // 2. Provision new workspace
     await adminDashboard.provisionTenant(testTenant.name, testTenant.pass, testTenant.type);
-
+    //await adminDashboard.page.reload();
     // 3. Verify workspace created in ACTIVE state
     await adminDashboard.verifyTenantStatus(testTenant.name, "ACTIVE");
 

@@ -46,8 +46,10 @@ export class AdminDashboardPage {
     await actionButton.click();
   }
 
-  async verifyTenantStatus(companyName: string, statusText: "ACTIVE" | "FROZEN" | "DELETED") {
+  async verifyTenantStatus(companyName: string, statusText: "ACTIVE" | "FROZEN" | "DELETED" | "active" | "frozen" | "deleted") {
+    await this.page.waitForLoadState("networkidle");
     const row = this.getTenantRow(companyName);
+    await expect(row).toBeVisible({timeout: 15000});
     await expect(row).toContainText(statusText);
   }
 }
