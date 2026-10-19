@@ -101,7 +101,8 @@ jobs:
           NEXT_TELEMETRY_DISABLED: 1
         run: npm run build
 
-      # 7. Execute Playwright E2E Suite
+            
+        # 7. Execute Playwright E2E Suite
       - name: Run Playwright Tests
         working-directory: frontend/my-app
         env:

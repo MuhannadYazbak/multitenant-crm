@@ -22,6 +22,7 @@ def reset_and_seed():
         return
 
     print("🏗️ Ensuring database tables exist from SQLAlchemy Base metadata...")
+    import models
     Base.metadata.create_all(bind=engine)
 
     print("🧹 Truncating existing tables for a clean seed state...")
