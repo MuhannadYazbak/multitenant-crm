@@ -35,7 +35,7 @@ export class AdminDashboardPage {
     await this.tenantTypeSelect.selectOption(type);
 
     const responsePromise = this.page.waitForResponse(
-      (resp) => resp.url().includes('/tenants') && (resp.status() === 200 || resp.status() === 201),
+      (resp) => resp.url().includes('admin/tenants') && (resp.status() === 200 || resp.status() === 201),
       { timeout: 10000 }
     );
 
