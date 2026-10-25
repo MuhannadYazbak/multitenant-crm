@@ -40,8 +40,8 @@ export class AdminDashboardPage {
   }
 
   getTenantRow(companyName: string): Locator {
-    // Robust locator matching table rows or any element containing the company name
-    return this.page.locator("tr, div").filter({ hasText: companyName }).first();
+    // Strictly target the table row containing the company name
+    return this.page.locator("tr").filter({ hasText: companyName });
   }
 
   async changeTenantStatus(companyName: string, targetStatus: "Activate" | "Freeze" | "Delete") {
