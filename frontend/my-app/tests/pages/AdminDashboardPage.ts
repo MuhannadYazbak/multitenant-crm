@@ -34,10 +34,17 @@ export class AdminDashboardPage {
     await this.passwordInput.fill(pass);
     await this.tenantTypeSelect.selectOption(type);
 
-    // Click and wait for the modal to close, signaling submission complete
+    // Set up waiter for the subsequent GET /admin/tenants table refresh
+    const fetchResponsePromise = this.page.waitForResponse(
+      (resp) => resp.url().includes('admin/tenants') && resp.request().method() === 'GET' && resp.status() === 200,
+      { timeout: 10000 }
+    ).catch(() => {}); // Non-blocking catch in case the fetch triggers differently
+
     await this.modalCreateButton.click();
     await expect(this.modalCreateButton).not.toBeVisible({ timeout: 10000 });
     
+    // Wait for the table fetch response and network to settle
+    await fetchResponsePromise;
     await this.page.waitForLoadState("networkidle");
   }
 
