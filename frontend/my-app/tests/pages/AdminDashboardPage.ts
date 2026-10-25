@@ -5,7 +5,7 @@ export class AdminDashboardPage {
   readonly page: Page;
   readonly addTenantButton: Locator;
   readonly logoutButton: Locator;
-  
+
   // Modal locators
   readonly companyNameInput: Locator;
   readonly passwordInput: Locator;
@@ -21,10 +21,6 @@ export class AdminDashboardPage {
     this.companyNameInput = page.locator('input[placeholder="e.g. company-e"]');
     this.passwordInput = page.locator('input[placeholder="••••••••"]');
     this.tenantTypeSelect = page.locator("select");
-    const responsePromise = this.page.waitForResponse(
-      (resp) => resp.url().includes('/tenants') && (resp.status() === 200 || resp.status() === 201),
-      { timeout: 10000 }
-    );
     this.modalCreateButton = page.locator("button", { hasText: "Create Tenant" });
   }
 
@@ -37,7 +33,18 @@ export class AdminDashboardPage {
     await this.companyNameInput.fill(name);
     await this.passwordInput.fill(pass);
     await this.tenantTypeSelect.selectOption(type);
+
+    const responsePromise = this.page.waitForResponse(
+      (resp) => resp.url().includes('/tenants') && (resp.status() === 200 || resp.status() === 201),
+      { timeout: 10000 }
+    );
+
     await this.modalCreateButton.click();
+    await responsePromise;
+
+    // Ensure modal is fully closed/dismissed before looking for the row
+    await expect(this.modalCreateButton).not.toBeVisible();
+    await this.page.waitForLoadState("networkidle");
   }
 
   getTenantRow(companyName: string): Locator {
@@ -53,7 +60,7 @@ export class AdminDashboardPage {
   async verifyTenantStatus(companyName: string, statusText: "ACTIVE" | "FROZEN" | "DELETED" | "active" | "frozen" | "deleted") {
     await this.page.waitForLoadState("networkidle");
     const row = this.getTenantRow(companyName);
-    await expect(row).toBeVisible({timeout: 15000});
+    await expect(row).toBeVisible({ timeout: 15000 });
     await expect(row).toContainText(statusText);
   }
 }
