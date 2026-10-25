@@ -13,6 +13,17 @@ test.describe("Admin System Lifecycle Suite", () => {
     type: "insurance" as const,
   };
 
+  test.beforeAll(async ({ request }) => {
+    // 1. Authenticate as superadmin to get a token
+    const loginRes = await request.post("http://localhost:8000/api/admin/login", {
+      data: { email: "superadmin@example.com", password: "your_superadmin_password" } // update credentials as per your test setup
+    });
+
+    // Alternatively, if you seed a known token or use API helper:
+    // For safety, you can also connect directly via a backend cleanup route if available, 
+    // or let the test API handle it.
+  });
+
   test.beforeEach(async ({ page, context }) => {
     await context.clearCookies();
     await page.goto('/');
@@ -43,6 +54,6 @@ test.describe("Admin System Lifecycle Suite", () => {
   });
 
   test.afterAll(async ({ browser }) => {
-  // Call admin delete endpoint or DB clean script to drop the test tenant schema
-});
+    // Call admin delete endpoint or DB clean script to drop the test tenant schema
+  });
 });
