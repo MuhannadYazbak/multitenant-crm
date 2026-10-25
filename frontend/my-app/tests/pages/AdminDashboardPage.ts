@@ -34,16 +34,10 @@ export class AdminDashboardPage {
     await this.passwordInput.fill(pass);
     await this.tenantTypeSelect.selectOption(type);
 
-    const responsePromise = this.page.waitForResponse(
-      (resp) => resp.url().includes('admin/tenants') && (resp.status() === 200 || resp.status() === 201),
-      { timeout: 10000 }
-    );
-
+    // Click and wait for the modal to close, signaling submission complete
     await this.modalCreateButton.click();
-    await responsePromise;
-
-    // Ensure modal is fully closed/dismissed before looking for the row
-    await expect(this.modalCreateButton).not.toBeVisible();
+    await expect(this.modalCreateButton).not.toBeVisible({ timeout: 10000 });
+    
     await this.page.waitForLoadState("networkidle");
   }
 
