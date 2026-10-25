@@ -28,7 +28,7 @@ export class ForgotPasswordPage {
 
     return {
       response,
-      devResetUrl: body.dev_reset_url,
+      devResetUrl: body.dev_reset_url || body.devResetUrl,
     };
   }
 }

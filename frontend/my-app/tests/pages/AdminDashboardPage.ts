@@ -21,6 +21,10 @@ export class AdminDashboardPage {
     this.companyNameInput = page.locator('input[placeholder="e.g. company-e"]');
     this.passwordInput = page.locator('input[placeholder="••••••••"]');
     this.tenantTypeSelect = page.locator("select");
+    const responsePromise = this.page.waitForResponse(
+      (resp) => resp.url().includes('/tenants') && (resp.status() === 200 || resp.status() === 201),
+      { timeout: 10000 }
+    );
     this.modalCreateButton = page.locator("button", { hasText: "Create Tenant" });
   }
 
