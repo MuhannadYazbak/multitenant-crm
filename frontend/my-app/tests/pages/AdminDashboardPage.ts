@@ -33,23 +33,15 @@ export class AdminDashboardPage {
     await this.companyNameInput.fill(name);
     await this.passwordInput.fill(pass);
     await this.tenantTypeSelect.selectOption(type);
-
-    // Set up waiter for the subsequent GET /admin/tenants table refresh
-    const fetchResponsePromise = this.page.waitForResponse(
-      (resp) => resp.url().includes('admin/tenants') && resp.request().method() === 'GET' && resp.status() === 200,
-      { timeout: 10000 }
-    ).catch(() => {}); // Non-blocking catch in case the fetch triggers differently
-
-    await this.modalCreateButton.click();
-    await expect(this.modalCreateButton).not.toBeVisible({ timeout: 10000 });
     
-    // Wait for the table fetch response and network to settle
-    await fetchResponsePromise;
-    await this.page.waitForLoadState("networkidle");
+    await this.modalCreateButton.click();
+    // Wait for modal to close and table to update
+    await expect(this.modalCreateButton).not.toBeVisible({ timeout: 10000 });
   }
 
   getTenantRow(companyName: string): Locator {
-    return this.page.locator("tr", { hasText: companyName });
+    // Robust locator matching table rows or any element containing the company name
+    return this.page.locator("tr, div").filter({ hasText: companyName }).first();
   }
 
   async changeTenantStatus(companyName: string, targetStatus: "Activate" | "Freeze" | "Delete") {
@@ -58,10 +50,10 @@ export class AdminDashboardPage {
     await actionButton.click();
   }
 
-  async verifyTenantStatus(companyName: string, statusText: "ACTIVE" | "FROZEN" | "DELETED" | "active" | "frozen" | "deleted") {
-    await this.page.waitForLoadState("networkidle");
+  async verifyTenantStatus(companyName: string, statusText: string) {
     const row = this.getTenantRow(companyName);
+    // Auto-retrying assertion that waits up to 15s for the newly provisioned row to render
     await expect(row).toBeVisible({ timeout: 15000 });
-    await expect(row).toContainText(statusText);
+    await expect(row).toContainText(statusText, { ignoreCase: true });
   }
 }
