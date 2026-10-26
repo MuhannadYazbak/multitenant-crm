@@ -68,7 +68,8 @@ jobs:
 
       - name: Install Playwright Browsers with Dependencies
         working-directory: frontend/my-app
-        run: npx playwright install --with-deps chromium
+        run: npx playwright install-deps chromium
+        #run: npx playwright install --with-deps chromium
 
       # 5. Initialize DB Schema & Seed Full Test Data
       - name: Initialize Database Schema and Seed Data
