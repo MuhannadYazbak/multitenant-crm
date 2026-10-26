@@ -1,20 +1,21 @@
-name: End-to-End Tests
+name: E2E Tests
 
 on:
   push:
-    branches: [ main, master ]
+    branches: [ main, feature/* ]
   pull_request:
-    branches: [ main, master ]
+    branches: [ main ]
 
 jobs:
-  test-e2e:
-    timeout-minutes: 15
+  test:
+    name: Run E2E Tests
     runs-on: ubuntu-latest
+    container:
+      image: mcr.microsoft.com/playwright:v1.61.1-noble
 
-    # 1. Spin up isolated PostgreSQL service container
     services:
       postgres:
-        image: postgres:17
+        image: postgres:15
         env:
           POSTGRES_USER: postgres
           POSTGRES_PASSWORD: postgrespassword
@@ -28,99 +29,54 @@ jobs:
           --health-retries 5
 
     steps:
-      - name: Checkout Repository
+      - name: Checkout repository
         uses: actions/checkout@v4
 
-      # 2. Setup Python & Backend Environment
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.11'
-          cache: 'pip'
-
-      - name: Install Backend Dependencies
-        run: |
-          python -m pip install --upgrade pip
-          if [ -f backend/requirements.txt ]; then pip install -r backend/requirements.txt; fi
-
-      # 3. Setup Node.js & Frontend Environment
-      - name: Set up Node.js
+      - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: 20
           cache: 'npm'
           cache-dependency-path: frontend/my-app/package-lock.json
 
-      - name: Install Frontend Dependencies
-        working-directory: frontend/my-app
-        run: npm ci
-
-      # 4. Cache Playwright Browsers
-      - name: Get Playwright Version
-        id: playwright-version
-        run: echo "version=$(node -p "require('./frontend/my-app/package.json').devDependencies['@playwright/test']")" >> $GITHUB_OUTPUT
-
-      - name: Cache Playwright Browsers
-        uses: actions/cache@v4
+      - name: Setup Python
+        uses: actions/setup-python@v5
         with:
-          path: ~/.cache/ms-playwright
-          key: playwright-${{ runner.os }}-${{ steps.playwright-version.outputs.version }}
+          python-version: '3.11'
+          cache: 'pip'
+          cache-dependency-path: backend/requirements.txt
 
-      - name: Install Playwright Browsers with Dependencies
-        working-directory: frontend/my-app
-        run: npx playwright install-deps chromium
-        #run: npx playwright install --with-deps chromium
+      - name: Install Backend Dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r backend/requirements.txt
 
-      # 5. Initialize DB Schema & Seed Full Test Data
-      - name: Initialize Database Schema and Seed Data
-        working-directory: backend
+      - name: Seed Database
         env:
-          DATABASE_URL: postgresql://postgres:postgrespassword@localhost:5432/saas_mvp_test2
-          SECRET_KEY: ci_super_secret_test_key_for_hmac_sha256_verification_32bytes
-          ADMIN_JWT_SECRET: super_secret_jwt_admin_key_999_32bytes
+          DATABASE_URL: postgresql://postgres:postgrespassword@postgres:5432/saas_mvp_test2
           ENV: test
-        run: python seed.py
+        run: |
+          cd backend
+          python seed.py
 
-      # # 6. Build Next.js Production App BEFORE Playwright
-      # - name: Build Next.js Production App
-      #   working-directory: frontend/my-app
-      #   env:
-      #     NEXT_PUBLIC_API_BASE_URL: http://127.0.0.1:8000
-      #     NEXT_PUBLIC_API_URL: http://127.0.0.1:8000
-      #     NEXT_TELEMETRY_DISABLED: 1
-      #   run: npm run build
+      - name: Install Frontend Dependencies
+        run: |
+          cd frontend/my-app
+          npm ci
 
-      # 6. Build Next.js Production App BEFORE Playwright
-      - name: Build Next.js Production App
-        working-directory: frontend/my-app
-        env:
-          DATABASE_URL: postgresql://postgres:postgrespassword@localhost:5432/saas_mvp_test2
-          NEXT_PUBLIC_API_BASE_URL: http://127.0.0.1:8000
-          NEXT_PUBLIC_API_URL: http://127.0.0.1:8000
-          SECRET_KEY: ci_super_secret_test_key_for_hmac_sha256_verification_32bytes
-          ADMIN_JWT_SECRET: super_secret_jwt_admin_key_999_32bytes
-          NEXT_TELEMETRY_DISABLED: 1
-        run: npm run build
-
-            
-        # 7. Execute Playwright E2E Suite
       - name: Run Playwright Tests
-        working-directory: frontend/my-app
         env:
-          DATABASE_URL: postgresql://postgres:postgrespassword@localhost:5432/saas_mvp_test2
-          NEXT_PUBLIC_API_BASE_URL: http://127.0.0.1:8000
-          SECRET_KEY: ci_super_secret_test_key_for_hmac_sha256_verification_32bytes
-          ADMIN_JWT_SECRET: super_secret_jwt_admin_key_999_32bytes
-          RESEND_API_KEY: ${{secrets.RESEND_API_KEY}}
-          NEXT_TELEMETRY_DISABLED: 1
+          DATABASE_URL: postgresql://postgres:postgrespassword@postgres:5432/saas_mvp_test2
+          ENV: test
           CI: true
-        run: npx playwright test
+        run: |
+          cd frontend/my-app
+          npx playwright test
 
-      # 8. Upload Test Artifacts on Failure
-      - name: Upload Playwright Report & Artifacts
+      - name: Upload Playwright Report
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: playwright-report
-          path: frontend/my-app/test-results/
-          retention-days: 7
+          path: frontend/my-app/playwright-report/
+          retention-days: 30
