@@ -4,7 +4,7 @@ export default defineConfig({
   retries: process.env.CI ? 2 : 0,
   testDir: "./tests",
   fullyParallel: false,
-  workers: process.env.CI? 1: undefined,
+  workers: process.env.CI? 4: undefined,
   use: {
     baseURL: process.env.BASE_URL || "http://127.0.0.1:3000",
     storageState: undefined,

@@ -25,20 +25,33 @@ def reset_and_seed():
     import models
     Base.metadata.create_all(bind=engine)
 
-    print("🧹 Truncating existing tables for a clean seed state...")
+    print("🧹 Cleaning up stale playwright test tenants and schemas...")
     with engine.connect() as conn:
         trans = conn.begin()
-        # try:
-        #     # Disable triggers/FKs temporarily while truncating
-        #     conn.execute(text("SET session_replication_role = 'replica';"))
-        #     for table in reversed(Base.metadata.sorted_tables):
-        #         conn.execute(text(f'TRUNCATE TABLE "{table.name}" RESTART IDENTITY CASCADE;'))
-        #     conn.execute(text("SET session_replication_role = 'origin';"))
-        #     trans.commit()
-        #     print("✨ Tables truncated successfully.")
-        # except Exception as e:
-        #     trans.rollback()
-        #     print(f"⚠️ Truncate skipped or encountered error: {e}")
+        try:
+            # 1. Fetch any stale test tenants
+            result = conn.execute(text(
+                "SELECT company_name FROM public.tenant_accounts WHERE company_name LIKE 'playwright-tenant%'"
+            ))
+            stale_tenants = result.fetchall()
+            
+            # 2. Drop each associated PostgreSQL schema
+            for (schema_name,) in stale_tenants:
+                if schema_name:
+                    safe_schema = schema_name.replace('"', '')
+                    conn.execute(text(f'DROP SCHEMA IF EXISTS "{safe_schema}" CASCADE;'))
+                    print(f"🗑️ Dropped stale tenant schema: {safe_schema}")
+            
+            # 3. Delete the tracking rows from public.tenant_accounts
+            conn.execute(text(
+                "DELETE FROM public.tenant_accounts WHERE company_name LIKE 'playwright-tenant%';"
+            ))
+            
+            trans.commit()
+            print("✨ Stale test tenants and schemas cleaned successfully.")
+        except Exception as e:
+            trans.rollback()
+            print(f"⚠️ Targeted cleanup skipped or encountered error: {e}")
 
     print(f"📖 Reading and parsing {data_path}...")
     with open(data_path, "r", encoding="utf-8") as f:
