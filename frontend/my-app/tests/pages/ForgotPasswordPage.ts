@@ -17,7 +17,7 @@ export class ForgotPasswordPage {
 
   async requestReset(identifier: string): Promise<{ response: Response; devResetUrl: string }> {
     const apiResponsePromise = this.page.waitForResponse(
-      (response) => response.url().includes('/auth/forgot-password') && response.status() === 200
+      (response) => response.url().includes('forgot-password') && (response.status() === 200 || response.status() === 201)
     );
 
     await this.tenantOrAdminInput.fill(identifier);
@@ -25,10 +25,10 @@ export class ForgotPasswordPage {
 
     const response = await apiResponsePromise;
     const body = await response.json();
-    
+
     return {
       response,
-      devResetUrl: body.dev_reset_url,
+      devResetUrl: body.dev_reset_url || body.devResetUrl,
     };
   }
 }

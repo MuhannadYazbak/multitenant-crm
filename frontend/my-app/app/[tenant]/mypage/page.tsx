@@ -2,12 +2,12 @@
 
 import { useEffect, useState, useMemo } from "react";
 import { useRouter, useParams } from "next/navigation";
+import Link from "next/link";
 import { Client } from "../../types/client";
 import { fetchAllClients, createClient, deleteClient } from "@/app/lib/api";
-import Navbar from "@/app/components/Navbar"
+import Navbar from "@/app/components/Navbar";
 import DashboardStatsWidget from "@/app/components/DashBoardStats";
-import SubsribeButton from "@/app/components/SubsriptionBtn"
-
+import SubsribeButton from "@/app/components/SubsriptionBtn";
 
 export default function Home() {
     const [client, setClient] = useState<Client>({
@@ -20,10 +20,28 @@ export default function Home() {
     const [formErrors, setFormErrors] = useState<{ [key: string]: string }>({});
     const [searchQuery, setSearchQuery] = useState("");
     const [isAddClientOpen, setIsAddClientOpen] = useState(false);
+    const [isManager, setIsManager] = useState(false);
+
     const router = useRouter();
     const params = useParams();
     const tenant = params.tenant as string;
     const [customFields, setCustomFields] = useState<{ key: string; value: string }[]>([]);
+
+    useEffect(() => {
+        // Check user role from localStorage
+        const rawUserData = localStorage.getItem("user_data");
+        if (rawUserData) {
+            try {
+                const user = JSON.parse(rawUserData);
+                const roles: string[] = user.roles?.map((r: any) => r.name) || [];
+                if (roles.includes("Manager") || roles.includes("Admin")) {
+                    setIsManager(true);
+                }
+            } catch (err) {
+                console.error("Failed to parse user_data from localStorage:", err);
+            }
+        }
+    }, []);
 
     const addCustomField = () => {
         setCustomFields([...customFields, { key: "", value: "" }]);
@@ -63,13 +81,11 @@ export default function Home() {
             const updatedClients = await fetchAllClients(tenant);
             setClients(updatedClients);
 
-            // RESET & CLOSE FORM
             setClient({ name: "", phone: "", email: "", address: "" });
             setCustomFields([]);
-            setIsAddClientOpen(false); // <--- CLOSE FORM ON SUCCESS
+            setIsAddClientOpen(false);
         } catch (error: any) {
             console.error("Failed to post new client:", error);
-            // Do NOT block tests with unhandled native alerts in CI if possible
         }
     };
 
@@ -115,6 +131,7 @@ export default function Home() {
     }, [client]);
 
     const STRIPE_PRO_PRICE_ID = 'price_1U3CjSFReYuSySfNQ5U1EQUV';
+
     return (
         <div className="min-h-screen bg-slate-50">
             <div className="flex flex-col">
@@ -122,12 +139,10 @@ export default function Home() {
                     <Navbar tenantName={tenant} />
                     <DashboardStatsWidget tenant={tenant} />
                 </div>
-                <SubsribeButton  tenantId={tenant} priceId={STRIPE_PRO_PRICE_ID} subscriptionStatus="" currentPeriodEnd=""/>
+                <SubsribeButton tenantId={tenant} priceId={STRIPE_PRO_PRICE_ID} subscriptionStatus="" currentPeriodEnd=""/>
             </div>
 
-
             <div className="flex flex-row justify-center items-center gap-3 mb-2">
-
                 <div className="flex-1 max-w-md">
                     <input
                         type="text"
@@ -147,11 +162,23 @@ export default function Home() {
                 >
                     {isAddClientOpen ? "✕ Close" : "➕ Add Client"}
                 </button>
+
+                {/* Manager Only Button */}
+                {isManager && (
+                    <Link
+                        href={`/${tenant}/mypage/users`}
+                        className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-white font-medium rounded-lg transition-colors flex items-center gap-2 shadow-sm"
+                    >
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
+                        </svg>
+                        Manage Team
+                    </Link>
+                )}
             </div>
 
             {isAddClientOpen && (
                 <div className="flex flex-col justify-center items-center shadow hover:bg-gray-100">
-
                     <form
                         className="max-w-md mx-auto p-6 bg-white rounded-lg shadow space-y-4"
                         onSubmit={handleAddClient}
@@ -160,8 +187,7 @@ export default function Home() {
                             <label>Name</label>
                             <input
                                 suppressHydrationWarning
-                                className={`text-s border rounded ${formErrors.name ? "border-red-500 bg-red-50" : "border-gray-200"
-                                    }`}
+                                className={`text-s border rounded ${formErrors.name ? "border-red-500 bg-red-50" : "border-gray-200"}`}
                                 placeholder="Enter Your Name"
                                 type="text"
                                 value={client.name}
@@ -178,8 +204,7 @@ export default function Home() {
                             <label>Phone</label>
                             <input
                                 suppressHydrationWarning
-                                className={`text-s border rounded ${formErrors.phone ? "border-red-500 bg-red-50" : "border-gray-200"
-                                    }`}
+                                className={`text-s border rounded ${formErrors.phone ? "border-red-500 bg-red-50" : "border-gray-200"}`}
                                 placeholder="Enter Your Phone Number"
                                 type="text"
                                 value={client.phone}
@@ -196,8 +221,7 @@ export default function Home() {
                             <label>Email</label>
                             <input
                                 suppressHydrationWarning
-                                className={`text-s border rounded ${formErrors.email ? "border-red-500 bg-red-50" : "border-gray-200"
-                                    }`}
+                                className={`text-s border rounded ${formErrors.email ? "border-red-500 bg-red-50" : "border-gray-200"}`}
                                 placeholder="Enter Your Email"
                                 type="text"
                                 value={client.email}
@@ -214,8 +238,7 @@ export default function Home() {
                             <label>Address</label>
                             <input
                                 suppressHydrationWarning
-                                className={`text-s border rounded ${formErrors.address ? "border-red-500 bg-red-50" : "border-gray-200"
-                                    }`}
+                                className={`text-s border rounded ${formErrors.address ? "border-red-500 bg-red-50" : "border-gray-200"}`}
                                 placeholder="Enter Your Address"
                                 type="text"
                                 value={client.address}
@@ -227,6 +250,7 @@ export default function Home() {
                                 </p>
                             )}
                         </div>
+
                         <div className="space-y-2 pt-2 border-t border-slate-200">
                             <div className="flex justify-between items-center">
                                 <label className="text-xs font-bold text-slate-600 uppercase">
@@ -287,8 +311,8 @@ export default function Home() {
                         </button>
                     </div>
                 </div>
-
             )}
+
             <div className="flex justify-center items-center p-2">
                 <div className="w-full max-w-4xl max-h-72 overflow-y-auto border rounded-lg shadow-sm">
                     <table className="w-full text-left border-collapse">
@@ -324,7 +348,7 @@ export default function Home() {
                                             <button
                                                 className="bg-red-500 hover:bg-red-600 text-white px-2.5 py-1 rounded text-xs font-medium transition"
                                                 onClick={async () => {
-                                                    if (!c.id) return; // Guarantees c.id is a number
+                                                    if (!c.id) return;
 
                                                     if (confirm(`Are you sure you want to remove ${c.name}?`)) {
                                                         try {

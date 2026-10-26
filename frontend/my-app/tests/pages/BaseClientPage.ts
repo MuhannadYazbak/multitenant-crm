@@ -47,24 +47,10 @@ export class BaseClientPage {
         this.toggleArchivedDocsButton = page.locator('#archive/unarchive');
     }
 
-    // --- NAVIGATION ---
+    // Navigation
     async goto(tenant: string, clientName: string) {
-        await this.page.context().addCookies([
-            {
-                name: 'auth_token',
-                value: 'mock_test_token', // or real JWT token from login
-                domain: '127.0.0.1',
-                path: '/',
-            },
-            {
-                name: 'user_tenant',
-                value: tenant, // matches the URL tenant
-                domain: '127.0.0.1',
-                path: '/',
-            },
-        ]);
         await this.page.goto(`/${tenant}/mypage/${encodeURIComponent(clientName)}`);
-        await this.page.locator('h1, h2', { hasText: clientName }).waitFor({ state: 'visible', timeout: 10000 });
+        await this.page.locator("#clientName").waitFor({ state: 'visible', timeout: 10000 });
         await this.page.waitForFunction(
             () => !document.body.innerText.includes('Loading'),
             { timeout: 10000 }
@@ -72,21 +58,26 @@ export class BaseClientPage {
         await this.page.waitForLoadState('networkidle');
     }
 
-    // --- SHARED NOTES ACTIONS ---
+
     async addNote(content: string, author: string = 'Test Admin', isPinned: boolean = false) {
         await this.notesTabButton.click();
         await this.authorInput.fill(author);
         await this.noteInput.fill(content);
+
         if (isPinned) {
             await this.page.check('input[type="checkbox"]');
         }
 
-        const responsePromise = this.page.waitForResponse(
-            (resp) => resp.url().includes('/notes') && (resp.status() === 200 || resp.status() === 201)
-        );
+        // Wrap click and response wait together so the listener is active BEFORE the click fires
+        await Promise.all([
+            this.page.waitForResponse(
+                (resp) => resp.url().includes('notes') && (resp.status() === 200 || resp.status() === 201),
+                { timeout: 10000 }
+            ),
+            this.addNoteButton.click()
+        ]);
 
-        await this.addNoteButton.click();
-        await responsePromise;
+        // Give Next.js client state a brief moment to update UI DOM
         await this.page.waitForLoadState('networkidle');
     }
 
@@ -97,32 +88,50 @@ export class BaseClientPage {
     }
 
     // --- SHARED DOCUMENTS ACTIONS ---
-    async uploadDocument(filePath: string, category: string = 'General') {
+    async uploadDocument(filePath: string, category: string = 'General', title: string = 'Document Title') {
         // 1. Ensure the Documents tab is clicked and active
         await this.docsTabButton.click();
 
-        // 2. Locate the file input, ensure attached and visible/ready
+        // 2. Locate the file input, ensure attached
         const fileInput = this.page.locator('input[type="file"]').first();
         await fileInput.waitFor({ state: 'attached', timeout: 10000 });
 
-        // 3. Attach file and dispatch change event to trigger React state (setSelectedFile)
+        // 3. Attach file
         await fileInput.setInputFiles(filePath);
-        await fileInput.dispatchEvent('change');
 
-        // 4. Handle category selection if present
-        if (category) {
-            const categorySelect = this.page.locator('form select, div[role="dialog"] select').first();
-            if (await categorySelect.isVisible({ timeout: 2000 }).catch(() => false)) {
-                await categorySelect.selectOption({ label: category }).catch(async () => {
-                    await categorySelect.selectOption(category);
-                });
-            }
+        // 4. Trigger React state binding updates
+        await fileInput.dispatchEvent('input');
+        await fileInput.dispatchEvent('change');
+        await this.page.waitForTimeout(500);
+
+        // 5. Fill document title/name if mandatory in form
+        const titleInput = this.page.locator('form input[type="text"], div[role="dialog"] input[type="text"]').first();
+        try {
+            await titleInput.waitFor({ state: 'visible', timeout: 3000 });
+            await titleInput.fill(title);
+            await titleInput.dispatchEvent('input');
+        } catch {
+            // Optional field, safe to skip if not present
         }
 
-        // 5. Wait for the upload button to become enabled
+        // 6. Handle category selection if present
+        //if (category) {
+        const categorySelect = this.page.locator('form select, div[role="dialog"] select').first();
+        try {
+            await categorySelect.waitFor({ state: 'visible', timeout: 3000 });
+            await categorySelect.selectOption({ label: category }).catch(async () => {
+                await categorySelect.selectOption(category);
+            });
+            await categorySelect.dispatchEvent('change');
+        } catch {
+            // Optional select, safe to skip if not present
+        }
+        // }
+
+        // 7. Wait for the upload button to become enabled
         await expect(this.uploadDocButton).toBeEnabled({ timeout: 10000 });
 
-        // 6. Set up API response promise & click upload
+        // 8. Set up API response promise & click upload
         const responsePromise = this.page.waitForResponse(
             (resp) => resp.url().includes('/documents') && (resp.status() === 200 || resp.status() === 201),
             { timeout: 10000 }
