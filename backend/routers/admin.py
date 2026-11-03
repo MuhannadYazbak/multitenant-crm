@@ -1,10 +1,12 @@
 # backend/routers/admin.py
-from fastapi import APIRouter, Depends, HTTPException, status
+from typing import List
+from fastapi import APIRouter, Depends, HTTPException, status, Request
 from sqlalchemy.orm import Session
 from sqlalchemy import text
-
+from pydantic import BaseModel
+from datetime import datetime
 from database import get_db
-from models import TenantAccount, Admin
+from models import TenantAccount, Admin, User, Role, UserRole, AuditLog
 from schemas import (
     TenantCreate, 
     TenantResponse, 
@@ -18,22 +20,85 @@ from auth_utils import (
     create_admin_access_token, 
     get_current_admin
 )
+from audit import log_activity
 
 router = APIRouter(prefix="/api/admin", tags=["admin"])
+
+
+# --- Schemas for Roles, Audit Logs & User Roles ---
+
+class RoleCreatePayload(BaseModel):
+    name: str
+    description: str | None = None
+    permissions: List[str]
+
+class RoleResponsePayload(BaseModel):
+    id: int
+    name: str
+    description: str | None = None
+    permissions: List[str]
+
+    class Config:
+        from_attributes = True
+
+class AssignRolePayload(BaseModel):
+    role_id: int
+
+class AuditLogResponse(BaseModel):
+    id: int
+    user_email: str
+    action: str
+    resource: str | None = None
+    details: dict | None = None
+    created_at: datetime | None = None
+
+    class Config:
+        from_attributes = True
+
 
 # --- Admin Authentication ---
 
 @router.post("/login", response_model=AdminToken)
 def admin_login(payload: AdminLogin, db: Session = Depends(get_db)):
-    admin = db.query(Admin).filter(Admin.username == payload.username).first()
-    if not admin or not verify_password(payload.password, admin.password_hash):
+    user = db.query(User).filter(User.email == payload.username).first()
+    if not user or not verify_password(payload.password, user.password_hash):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Incorrect admin username or password"
         )
-    
-    access_token = create_admin_access_token(data={"sub": admin.username})
-    return {"access_token": access_token, "token_type": "bearer"}
+
+    user_roles = [
+        {
+            "id": ur.role.id,
+            "name": ur.role.name,
+            "permissions": ur.role.permissions
+        }
+        for ur in user.user_roles if ur.role
+    ]
+
+    allowed_roles = {"super_admin", "admin"}
+    role_names_lower = {r["name"].lower() for r in user_roles}
+
+    if not allowed_roles.intersection(role_names_lower):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Access denied: Account lacks administrative privileges"
+        )
+
+    access_token = create_admin_access_token(data={"sub": user.email})
+
+    return {
+        "access_token": access_token,
+        "token_type": "bearer",
+        "user": {
+            "id": user.id,
+            "tenant_id": user.tenant_id,
+            "email": user.email,
+            "full_name": user.full_name,
+            "is_active": user.is_active,
+            "roles": user_roles
+        }
+    }
 
 
 @router.post("/seed-initial-admin", status_code=201)
@@ -52,11 +117,141 @@ def seed_initial_admin(payload: AdminLogin, db: Session = Depends(get_db)):
     return {"message": f"Admin user '{payload.username}' created successfully!"}
 
 
-# --- Tenant Provisioning & Management (Protected by Admin JWT) ---
+# --- Role & Permission Management ---
+
+@router.post("/roles", response_model=RoleResponsePayload, status_code=201)
+def create_role(
+    payload: RoleCreatePayload,
+    request: Request,
+    db: Session = Depends(get_db),
+    admin_username: str = Depends(get_current_admin)
+):
+    existing = db.query(Role).filter(Role.name == payload.name).first()
+    if existing:
+        raise HTTPException(status_code=400, detail=f"Role '{payload.name}' already exists.")
+
+    new_role = Role(
+        name=payload.name,
+        description=payload.description,
+        permissions=payload.permissions
+    )
+    db.add(new_role)
+    db.flush()
+
+    log_activity(
+        db=db,
+        action="ROLE_CREATED",
+        resource="roles",
+        user_email=admin_username,
+        details={"role_id": new_role.id, "role_name": new_role.name, "permissions": payload.permissions},
+        request=request
+    )
+
+    db.commit()
+    db.refresh(new_role)
+    return new_role
+
+
+@router.get("/roles", response_model=List[RoleResponsePayload])
+def list_roles(
+    db: Session = Depends(get_db),
+    admin_username: str = Depends(get_current_admin)
+):
+    return db.query(Role).all()
+
+
+@router.post("/users/{user_id}/roles", status_code=200)
+def assign_role_to_user(
+    user_id: int,
+    payload: AssignRolePayload,
+    request: Request,
+    db: Session = Depends(get_db),
+    admin_username: str = Depends(get_current_admin)
+):
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found.")
+
+    role = db.query(Role).filter(Role.id == payload.role_id).first()
+    if not role:
+        raise HTTPException(status_code=404, detail="Role not found.")
+
+    existing_link = (
+        db.query(UserRole)
+        .filter(UserRole.user_id == user_id, UserRole.role_id == payload.role_id)
+        .first()
+    )
+    if existing_link:
+        raise HTTPException(status_code=400, detail="User already has this role.")
+
+    user_role = UserRole(user_id=user_id, role_id=payload.role_id)
+    db.add(user_role)
+    
+    log_activity(
+        db=db,
+        action="ROLE_ASSIGNED",
+        resource="roles",
+        tenant_id=user.tenant_id,
+        user_email=admin_username,
+        details={"target_user_id": user_id, "role_id": payload.role_id, "role_name": role.name},
+        request=request
+    )
+
+    db.commit()
+    return {"message": f"Role '{role.name}' assigned to user successfully."}
+
+
+@router.delete("/users/{user_id}/roles/{role_id}", status_code=200)
+def revoke_role_from_user(
+    user_id: int,
+    role_id: int,
+    request: Request,
+    db: Session = Depends(get_db),
+    admin_username: str = Depends(get_current_admin)
+):
+    user = db.query(User).filter(User.id == user_id).first()
+    user_role = (
+        db.query(UserRole)
+        .filter(UserRole.user_id == user_id, UserRole.role_id == role_id)
+        .first()
+    )
+    if not user_role:
+        raise HTTPException(status_code=404, detail="Role assignment not found for this user.")
+
+    role_name = user_role.role.name if user_role.role else f"Role #{role_id}"
+    db.delete(user_role)
+
+    log_activity(
+        db=db,
+        action="ROLE_REVOKED",
+        resource="roles",
+        tenant_id=user.tenant_id if user else None,
+        user_email=admin_username,
+        details={"target_user_id": user_id, "role_id": role_id, "role_name": role_name},
+        request=request
+    )
+
+    db.commit()
+    return {"message": "Role revoked successfully."}
+
+
+# --- Audit Logs Endpoint ---
+
+@router.get("/audit-logs", response_model=List[AuditLogResponse])
+def list_audit_logs(
+    db: Session = Depends(get_db),
+    admin_username: str = Depends(get_current_admin)
+):
+    """Retrieves all system audit log entries in reverse chronological order."""
+    return db.query(AuditLog).order_by(AuditLog.id.desc()).all()
+
+
+# --- Tenant Provisioning & Management ---
 
 @router.post("/tenants", response_model=TenantResponse, status_code=201)
 def onboard_tenant(
     payload: TenantCreate,
+    request: Request,
     db: Session = Depends(get_db),
     admin_username: str = Depends(get_current_admin),
 ):
@@ -79,7 +274,7 @@ def onboard_tenant(
         # 1. Create Dedicated Schema
         db.execute(text(f'CREATE SCHEMA IF NOT EXISTS "{schema_name}"'))
 
-        # 2. Base Clients Table (All tenants get this)
+        # 2. Base Clients Table
         db.execute(
             text(f"""
             CREATE TABLE IF NOT EXISTS "{schema_name}".clients (
@@ -94,7 +289,7 @@ def onboard_tenant(
         """)
         )
 
-        # 3. Conditional Vertical Tables
+        # 3. Vertical Tables
         if tenant_type_clean == "legal":
             db.execute(text(f"""
                 CREATE TABLE IF NOT EXISTS "{schema_name}".legal_cases (
@@ -124,12 +319,10 @@ def onboard_tenant(
                 );
             """))
 
-        # 4. Universal Sub-Resource Tables (Provisioned for ALL tenant types)
-        # Dynamic foreign key constraints based on tenant vertical
+        # 4. Universal Sub-Resource Tables
         case_fk_clause = f'REFERENCES "{schema_name}".legal_cases(id) ON DELETE CASCADE' if tenant_type_clean == "legal" else ""
         policy_fk_clause = f'REFERENCES "{schema_name}".insurance_policies(id) ON DELETE CASCADE' if tenant_type_clean == "insurance" else ""
 
-        # A. Notes
         db.execute(text(f"""
             CREATE TABLE IF NOT EXISTS "{schema_name}".notes (
                 id SERIAL PRIMARY KEY,
@@ -144,7 +337,6 @@ def onboard_tenant(
             );
         """))
 
-        # B. Documents
         db.execute(text(f"""
             CREATE TABLE IF NOT EXISTS "{schema_name}".documents (
                 id SERIAL PRIMARY KEY,
@@ -161,7 +353,6 @@ def onboard_tenant(
             );
         """))
 
-        # C. Billing Entries
         db.execute(text(f"""
             CREATE TABLE IF NOT EXISTS "{schema_name}".billing_entries (
                 id SERIAL PRIMARY KEY,
@@ -185,6 +376,35 @@ def onboard_tenant(
             status="active",
         )
         db.add(new_account)
+        db.flush()
+
+        # 6. Create Initial Tenant Manager User
+        manager_email = f"manager@{payload.company_name.lower().replace(' ', '')}.com"
+        manager_user = User(
+            tenant_id=new_account.id,
+            email=manager_email,
+            password_hash=hashed_pwd,
+            full_name=f"{payload.company_name} Manager",
+            is_active=True
+        )
+        db.add(manager_user)
+        db.flush()
+
+        manager_role = db.query(Role).filter(Role.name.ilike("Manager")).first() or db.query(Role).filter(Role.name.ilike("Admin")).first()
+        if manager_role:
+            db.add(UserRole(user_id=manager_user.id, role_id=manager_role.id))
+
+        # 7. Record System Audit Log Entry
+        log_activity(
+            db=db,
+            action="TENANT_PROVISIONED",
+            resource="tenants",
+            tenant_id=new_account.id,
+            user_email=admin_username,
+            details={"company_name": payload.company_name, "tenant_type": payload.tenant_type},
+            request=request
+        )
+
         db.commit()
         db.refresh(new_account)
 
@@ -202,7 +422,6 @@ def list_tenants(
     db: Session = Depends(get_db),
     admin_username: str = Depends(get_current_admin)
 ):
-    """Lists all tenants regardless of status."""
     return db.query(TenantAccount).order_by(TenantAccount.id.asc()).all()
 
 
@@ -210,6 +429,7 @@ def list_tenants(
 def update_tenant_status(
     company_name: str,
     payload: TenantStatusUpdate,
+    request: Request,
     db: Session = Depends(get_db),
     admin_username: str = Depends(get_current_admin)
 ):
@@ -217,7 +437,19 @@ def update_tenant_status(
     if not tenant:
         raise HTTPException(status_code=404, detail="Tenant workspace not found.")
     
+    old_status = tenant.status
     tenant.status = payload.status
+
+    log_activity(
+        db=db,
+        action="TENANT_STATUS_UPDATED",
+        resource="tenants",
+        tenant_id=tenant.id,
+        user_email=admin_username,
+        details={"company_name": company_name, "previous_status": old_status, "new_status": payload.status},
+        request=request
+    )
+
     db.commit()
     db.refresh(tenant)
     return tenant

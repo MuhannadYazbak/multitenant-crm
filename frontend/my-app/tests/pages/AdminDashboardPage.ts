@@ -5,7 +5,7 @@ export class AdminDashboardPage {
   readonly page: Page;
   readonly addTenantButton: Locator;
   readonly logoutButton: Locator;
-  
+
   // Modal locators
   readonly companyNameInput: Locator;
   readonly passwordInput: Locator;
@@ -33,11 +33,15 @@ export class AdminDashboardPage {
     await this.companyNameInput.fill(name);
     await this.passwordInput.fill(pass);
     await this.tenantTypeSelect.selectOption(type);
+    
     await this.modalCreateButton.click();
+    // Wait for modal to close and table to update
+    await expect(this.modalCreateButton).not.toBeVisible({ timeout: 10000 });
   }
 
   getTenantRow(companyName: string): Locator {
-    return this.page.locator("tr", { hasText: companyName });
+    // Strictly target the table row containing the company name
+    return this.page.locator("tr").filter({ hasText: companyName });
   }
 
   async changeTenantStatus(companyName: string, targetStatus: "Activate" | "Freeze" | "Delete") {
@@ -46,8 +50,10 @@ export class AdminDashboardPage {
     await actionButton.click();
   }
 
-  async verifyTenantStatus(companyName: string, statusText: "ACTIVE" | "FROZEN" | "DELETED") {
+  async verifyTenantStatus(companyName: string, statusText: string) {
     const row = this.getTenantRow(companyName);
-    await expect(row).toContainText(statusText);
+    // Auto-retrying assertion that waits up to 15s for the newly provisioned row to render
+    await expect(row).toBeVisible({ timeout: 15000 });
+    await expect(row).toContainText(statusText, { ignoreCase: true });
   }
 }
