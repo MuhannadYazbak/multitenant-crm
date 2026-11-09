@@ -7,6 +7,7 @@ import { VehicleData, VehicleResponse } from "@/app/types/vehicle";
 import { PropertyData, PropertyResponse } from "@/app/types/property";
 import { EvidenceData, EvidenceResponse } from "../types/evidence";
 import { WitnessData, WitnessResponse } from "../types/witness";
+import { AuditLog } from "../types/auth";
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 const STRIPE_SERVICE_URL = process.env.NEXT_PUBLIC_STRIPE_SERVICE_URL || "https://paymentsmicroservice.onrender.com";
@@ -91,16 +92,16 @@ export async function apiFetch<T = any>(
 
 // --- Audit Logs ---
 
-export interface AuditLog {
-  id: number;
-  tenant_id?: number | null;
-  user_email?: string | null;
-  action: string;
-  resource?: string | null;
-  details?: Record<string, any> | null;
-  ip_address?: string | null;
-  created_at?: string | null;
-}
+// export interface AuditLog {
+//   id: number;
+//   tenant_id?: number | null;
+//   user_email?: string | null;
+//   action: string;
+//   resource?: string | null;
+//   details?: Record<string, any> | null;
+//   ip_address?: string | null;
+//   created_at?: string | null;
+// }
 
 /**
  * Fetches activity audit logs for either Super Admin (system-wide) or Tenant Manager (tenant-scoped).

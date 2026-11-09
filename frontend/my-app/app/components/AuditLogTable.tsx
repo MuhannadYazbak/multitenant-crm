@@ -1,7 +1,8 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { fetchAuditLogs, AuditLog } from "@/app/lib/api";
+import { fetchAuditLogs } from "@/app/lib/api";
+import { AuditLog } from "../types/auth";
 
 export default function AuditLogTable({ tenantSlug }: { tenantSlug?: string }) {
   const [logs, setLogs] = useState<AuditLog[]>([]);
